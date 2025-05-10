@@ -1,0 +1,330 @@
+-- Update command list function
+function updateCommandList(searchQuery)
+    -- Clear list
+    for _, child in pairs(commandList:GetChildren()) do
+        if child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+    
+    -- Add new commands
+    local yOffset = 0
+    local buttonHeight = 40
+    
+    -- Determine which commands to show
+    local commandsToShow = {}
+    
+    if activeTab == "Favorites" then
+        -- Show only favorite commands
+        for _, cmd in ipairs(commands) do
+            if isCommandFavorite(cmd.name) then
+                table.insert(commandsToShow, cmd)
+            end
+        end
+    else
+        -- Show commands based on category and search
+        for _, cmd in ipairs(commands) do
+            if (activeTab == "Main" or cmd.category == activeTab) and 
+               (searchQuery == "" or string.find(string.lower(cmd.name), string.lower(searchQuery)) or 
+                string.find(string.lower(cmd.desc), string.lower(searchQuery))) then
+                table.insert(commandsToShow, cmd)
+            end
+        end
+    end
+    
+    -- Sort alphabetically
+    table.sort(commandsToShow, function(a, b)
+        return a.name < b.name
+    end)
+    
+    -- Create buttons for each command
+    for _, cmd in ipairs(commandsToShow) do
+        -- Command button
+        local commandButton = Instance.new("Frame")
+        commandButton.Name = cmd.name .. "Button"
+        commandButton.Size = UDim2.new(1, -10, 0, buttonHeight)
+        commandButton.BackgroundColor3 = colors.button
+        commandButton.BorderSizePixel = 0
+        commandButton.Parent = commandList
+        
+        local commandCorner = Instance.new("UICorner")
+        commandCorner.CornerRadius = UDim.new(0, 6)
+        commandCorner.Parent = commandButton
+        
+        -- Command name
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Size = UDim2.new(0.4, -10, 1, 0)
+        nameLabel.Position = UDim2.new(0, 10, 0, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = cmd.name
+        nameLabel.Font = Enum.Font.GothamSemibold
+        nameLabel.TextSize = 14
+        nameLabel.TextColor3 = colors.text
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.Parent = commandButton
+        
+        -- Command description
+        local descLabel = Instance.new("TextLabel")
+        descLabel.Size = UDim2.new(0.6, -35, 1, 0)
+        descLabel.Position = UDim2.new(0.4, 0, 0, 0)
+        descLabel.BackgroundTransparency = 1
+        descLabel.Text = cmd.desc
+        descLabel.Font = Enum.Font.Gotham
+        descLabel.TextSize = 12
+        descLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        descLabel.TextXAlignment = Enum.TextXAlignment.Left
+        descLabel.TextWrapped = true
+        descLabel.Parent = commandButton
+        
+        -- Background button
+        local clickButton = Instance.new("TextButton")
+        clickButton.Size = UDim2.new(1, 0, 1, 0)
+        clickButton.BackgroundTransparency = 1
+        clickButton.Text = ""
+        clickButton.ZIndex = 10
+        clickButton.Parent = commandButton
+        
+        -- Favorite button (star)
+        if cmd.canFavorite then
+            local favButton = Instance.new("TextButton")
+            favButton.Size = UDim2.new(0, 25, 0, 25)
+            favButton.Position = UDim2.new(1, -30, 0.5, -12.5)
+            favButton.BackgroundTransparency = 1
+            favButton.Text = "★"
+            favButton.Font = Enum.Font.GothamBold
+            favButton.TextSize = 18
+            favButton.TextColor3 = isCommandFavorite(cmd.name) and colors.favorite or Color3.fromRGB(120, 120, 120)
+            favButton.Parent = commandButton
+            
+            -- Favorite click function
+            favButton.MouseButton1Click:Connect(function()
+                toggleFavorite(cmd.name)
+                favButton.TextColor3 = isCommandFavorite(cmd.name) and colors.favorite or Color3.fromRGB(120, 120, 120)
+            end)
+        end
+        
+        -- Button hover effect
+        clickButton.MouseEnter:Connect(function()
+            commandButton.BackgroundColor3 = colors.buttonHover
+        end)
+        
+        clickButton.MouseLeave:Connect(function()
+            commandButton.BackgroundColor3 = colors.button
+        end)
+        
+        -- Click function
+        clickButton.MouseButton1Click:Connect(function()
+            -- Run command
+            if cmd.func then
+                cmd.func()
+            end
+            
+            -- Button press effect
+            commandButton.BackgroundColor3 = colors.buttonSelected
+            wait(0.1)
+            commandButton.BackgroundColor3 = colors.button
+        end)
+        
+        yOffset = yOffset + buttonHeight + 5
+    end
+    
+    -- Adjust canvas size
+    commandList.CanvasSize = UDim2.new(0, 0, 0, yOffset)
+end
+-- Create resize handles for the GUI
+function createResizeHandles(frame)
+    local handleSize = 10
+    local handles = {}
+    
+    -- Corner handles
+    local positions = {
+        {0, 0, "nw-resize"},  -- Top-left
+        {1, 0, "ne-resize"},  -- Top-right
+        {0, 1, "sw-resize"},  -- Bottom-left
+        {1, 1, "se-resize"}   -- Bottom-right
+    }
+    
+    for _, pos in ipairs(positions) do
+        local handle = Instance.new("TextButton")
+        handle.Size = UDim2.new(0, handleSize, 0, handleSize)
+        handle.Position = UDim2.new(pos[1], pos[1] == 0 and 0 or -handleSize, pos[2], pos[2] == 0 and 0 or -handleSize)
+        handle.Text = ""
+        handle.BackgroundTransparency = 1
+        handle.ZIndex = 10
+        handle.Parent = frame
+        
+        -- Cursor style
+        if pos[3] then
+            handle.MouseEnter:Connect(function()
+                if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then return end
+                if resizingGui then return end
+                UserInputService.MouseIcon = pos[3]
+            end)
+            
+            handle.MouseLeave:Connect(function()
+                if resizingGui then return end
+                UserInputService.MouseIcon = ""
+            end)
+        end
+        
+        -- Resize logic
+        local mode = {x = pos[1], y = pos[2]}
+        
+        handle.MouseButton1Down:Connect(function()
+            resizingGui = true
+            local startPos = UserInputService:GetMouseLocation()
+            local startSize = frame.AbsoluteSize
+            local startPosition = frame.AbsolutePosition
+            
+            local connection
+            connection = UserInputService.InputChanged:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseMovement then
+                    local delta = UserInputService:GetMouseLocation() - startPos
+                    local newSize = startSize
+                    local newPos = startPosition
+                    
+                    -- Resize logic based on handle position
+                    if mode.x == 0 then  -- Left handles
+                        newSize = Vector2.new(startSize.X - delta.X, newSize.Y)
+                        newPos = Vector2.new(startPosition.X + delta.X, newPos.Y)
+                    elseif mode.x == 1 then  -- Right handles
+                        newSize = Vector2.new(startSize.X + delta.X, newSize.Y)
+                    end
+                    
+                    if mode.y == 0 then  -- Top handles
+                        newSize = Vector2.new(newSize.X, startSize.Y - delta.Y)
+                        newPos = Vector2.new(newPos.X, startPosition.Y + delta.Y)
+                    elseif mode.y == 1 then  -- Bottom handles
+                        newSize = Vector2.new(newSize.X, startSize.Y + delta.Y)
+                    end
+                    
+                    -- Apply minimum size constraints
+                    newSize = Vector2.new(
+                        math.max(newSize.X, minGuiSize.X.Offset),
+                        math.max(newSize.Y, minGuiSize.Y.Offset)
+                    )
+                    
+                    -- Update frame
+                    frame.Position = UDim2.new(
+                        0, newPos.X,
+                        0, newPos.Y
+                    )
+                    
+                    frame.Size = UDim2.new(
+                        0, newSize.X,
+                        0, newSize.Y
+                    )
+                end
+            end)
+            
+            -- Handle mouse release
+            local releaseConn
+            releaseConn = UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    connection:Disconnect()
+                    releaseConn:Disconnect()
+                    resizingGui = false
+                    UserInputService.MouseIcon = ""
+                    
+                    -- Save the new GUI size
+                    saveGuiSettings()
+                end
+            end)
+        end)
+        
+        table.insert(handles, handle)
+    end
+    
+    return handles
+end
+-- Show first category
+updateContentPanel()
+-- Add key bindings
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end -- Ignore if game is processing input
+    
+    -- GUI toggle hotkey (RightControl)
+    if input.KeyCode == Enum.KeyCode.RightControl then
+        if miniSize then
+            -- If in mini mode, switch to full GUI
+            miniSize = false
+            mainFrame.Visible = true
+            miniLogo.Visible = false
+        else
+            -- Toggle visibility
+            guiVisible = not guiVisible
+            mainGUI.Enabled = guiVisible
+        end
+        return
+    end
+    
+    -- Check key bindings
+    local keyName = input.KeyCode.Name
+    
+    -- Fly toggle
+    if keyName == keyBindSettings.Fly.key and keyBindSettings.Fly.enabled ~= flying then
+        toggleFly()
+    end
+    
+    -- Noclip toggle
+    if keyName == keyBindSettings.Noclip.key and keyBindSettings.Noclip.enabled ~= noclip then
+        toggleNoclip()
+    end
+    
+    -- ESP toggle
+    if keyName == keyBindSettings.ESP.key and keyBindSettings.ESP.enabled ~= espSettings.enabled then
+        toggleESP()
+    end
+    
+    -- Aimbot toggle
+    if keyName == keyBindSettings.Aimbot.key and keyBindSettings.Aimbot.enabled ~= aimbotSettings.enabled then
+        toggleAimbot()
+    end
+    
+    -- Reset character
+    if keyName == keyBindSettings.Reset.key and keyBindSettings.Reset.enabled then
+        resetCharacter()
+    end
+    
+    -- Speed boost (on key down)
+    if keyName == keyBindSettings.Speed.key and keyBindSettings.Speed.enabled then
+        setWalkSpeed(50) -- Boost speed
+    end
+    
+    -- Handle infinite jump
+    if keyName == "Space" and infiniteJump and player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+-- Handle key release events
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    local keyName = input.KeyCode.Name
+    
+    -- Speed boost (on key up)
+    if keyName == keyBindSettings.Speed.key and keyBindSettings.Speed.enabled then
+        setWalkSpeed(16) -- Return to normal speed
+    end
+end)
+-- Infinite jump event
+UserInputService.JumpRequest:Connect(function()
+    if infiniteJump and player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+-- Make GUI visible
+mainGUI.Enabled = true
+guiCreated = true
+guiVisible = true
+return mainGUI
+end
+-- Start GUI
+if not keyVerified then
+    createKeyVerificationGUI()
+else
+    createMainGUI()
+end
+-- Startup message
+print("KILASIK GUI loaded! Key: " .. KEY_CODE)
+print("Use RightControl to toggle GUI.")
