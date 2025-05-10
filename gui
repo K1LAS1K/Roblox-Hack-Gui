@@ -1,0 +1,2458 @@
+--[[
+  RobloxCheatGUI - Advanced Cheat Interface for Roblox
+  This script creates a fully-featured GUI with multiple cheats for Roblox games.
+  Use with executors like JJSploit.
+]]
+
+------------------------------
+-- Services
+------------------------------
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local Teams = game:GetService("Teams")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+------------------------------
+-- Module Functions
+------------------------------
+
+------------------------------
+-- UIEffects Module
+------------------------------
+local UIEffects = {}
+
+-- Define standard tween times
+local FADE_TIME = 0.3
+local SLIDE_TIME = 0.5
+local BOUNCE_TIME = 0.7
+
+-- Define easing styles
+local EASE_STYLES = {
+    In = Enum.EasingStyle.Sine,
+    Out = Enum.EasingStyle.Sine,
+    InOut = Enum.EasingStyle.Sine,
+    Bounce = Enum.EasingStyle.Bounce,
+    Elastic = Enum.EasingStyle.Elastic
+}
+
+-- Define easing directions
+local EASE_DIRECTIONS = {
+    In = Enum.EasingDirection.In,
+    Out = Enum.EasingDirection.Out,
+    InOut = Enum.EasingDirection.InOut
+}
+
+-- Apply transparency to a GUI object and its descendants
+function applyTransparency(guiObject, transparency, originalValues)
+    if not guiObject:IsA("GuiObject") then return end
+    
+    -- Store original transparency values
+    originalValues = originalValues or {}
+    originalValues[guiObject] = {
+        BackgroundTransparency = guiObject.BackgroundTransparency
+    }
+    
+    -- Apply transparency
+    guiObject.BackgroundTransparency = transparency
+    
+    -- Handle specific GUI types
+    if guiObject:IsA("TextLabel") or guiObject:IsA("TextButton") or guiObject:IsA("TextBox") then
+        originalValues[guiObject].TextTransparency = guiObject.TextTransparency
+        originalValues[guiObject].TextStrokeTransparency = guiObject.TextStrokeTransparency
+        
+        guiObject.TextTransparency = transparency
+        guiObject.TextStrokeTransparency = 1 -- Text stroke always fully transparent
+    end
+    
+    if guiObject:IsA("ImageLabel") or guiObject:IsA("ImageButton") then
+        originalValues[guiObject].ImageTransparency = guiObject.ImageTransparency
+        guiObject.ImageTransparency = transparency
+    end
+    
+    -- Apply to children
+    for _, child in ipairs(guiObject:GetChildren()) do
+        if child:IsA("GuiObject") then
+            applyTransparency(child, transparency, originalValues)
+        end
+    end
+    
+    return originalValues
+end
+
+-- Fade in a UI element
+function UIEffects.fadeIn(guiObject, callback)
+    if not guiObject then return end
+    
+    -- Save original transparency
+    local originalTransparency = {}
+    local originalPos = guiObject.Position
+    
+    -- Apply initial transparency
+    guiObject.BackgroundTransparency = 1
+    applyTransparency(guiObject, 1, originalTransparency)
+    
+    -- Set initial position slightly offset
+    guiObject.Position = originalPos + UDim2.new(0, 0, 0, 20)
+    
+    -- Create tween for fade in
+    local tweenInfo = TweenInfo.new(
+        FADE_TIME,
+        EASE_STYLES.Out,
+        EASE_DIRECTIONS.Out
+    )
+    
+    local fadeGoals = {
+        Position = originalPos,
+        BackgroundTransparency = 0
+    }
+    
+    local fadeTween = TweenService:Create(guiObject, tweenInfo, fadeGoals)
+    fadeTween:Play()
+    
+    -- Also tween all children
+    for _, child in ipairs(guiObject:GetDescendants()) do
+        if child:IsA("GuiObject") and originalTransparency[child] then
+            local childTween = TweenService:Create(child, tweenInfo, {
+                BackgroundTransparency = originalTransparency[child].BackgroundTransparency or 0,
+                TextTransparency = originalTransparency[child].TextTransparency or 0,
+                TextStrokeTransparency = originalTransparency[child].TextStrokeTransparency or 1,
+                ImageTransparency = originalTransparency[child].ImageTransparency or 0
+            })
+            childTween:Play()
+        end
+    end
+    
+    -- Call callback when complete
+    if callback then
+        fadeTween.Completed:Connect(callback)
+    end
+    
+    return fadeTween
+end
+
+-- Fade out a UI element
+function UIEffects.fadeOut(guiObject, callback)
+    if not guiObject then return end
+    
+    -- Create tween for fade out
+    local tweenInfo = TweenInfo.new(
+        FADE_TIME,
+        EASE_STYLES.In,
+        EASE_DIRECTIONS.In
+    )
+    
+    local fadeGoals = {
+        Position = guiObject.Position + UDim2.new(0, 0, 0, 20),
+        BackgroundTransparency = 1
+    }
+    
+    local fadeTween = TweenService:Create(guiObject, tweenInfo, fadeGoals)
+    fadeTween:Play()
+    
+    -- Also tween all children to fully transparent
+    for _, child in ipairs(guiObject:GetDescendants()) do
+        if child:IsA("GuiObject") then
+            local childGoals = {
+                BackgroundTransparency = 1
+            }
+            
+            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
+                childGoals.TextTransparency = 1
+                childGoals.TextStrokeTransparency = 1
+            end
+            
+            if child:IsA("ImageLabel") or child:IsA("ImageButton") then
+                childGoals.ImageTransparency = 1
+            end
+            
+            local childTween = TweenService:Create(child, tweenInfo, childGoals)
+            childTween:Play()
+        end
+    end
+    
+    -- Call callback when complete
+    if callback then
+        fadeTween.Completed:Connect(callback)
+    end
+    
+    return fadeTween
+end
+
+-- Minimize frame animation
+function UIEffects.minimizeFrame(frame)
+    if not frame then return end
+    
+    local originalSize = frame.Size
+    local originalPos = frame.Position
+    local targetSize = UDim2.new(originalSize.X.Scale, originalSize.X.Offset, 0, 30)
+    
+    -- Calculate target position (keep the top in the same place)
+    local targetPos = UDim2.new(
+        originalPos.X.Scale,
+        originalPos.X.Offset,
+        originalPos.Y.Scale,
+        originalPos.Y.Offset
+    )
+    
+    -- Store original children visibility
+    local childrenStates = {}
+    for _, child in ipairs(frame:GetChildren()) do
+        if child:IsA("GuiObject") and child.Name ~= "TitleBar" then
+            childrenStates[child] = child.Visible
+            child.Visible = false
+        end
+    end
+    
+    -- Create minimize tween
+    local tweenInfo = TweenInfo.new(
+        0.5,
+        EASE_STYLES.InOut,
+        EASE_DIRECTIONS.InOut
+    )
+    
+    local minimizeGoals = {
+        Size = targetSize,
+        Position = targetPos
+    }
+    
+    local minimizeTween = TweenService:Create(frame, tweenInfo, minimizeGoals)
+    minimizeTween:Play()
+    
+    -- Set up expand function on title bar click
+    local titleBar = frame:FindFirstChild("TitleBar")
+    if titleBar then
+        -- Remove existing connections
+        local existingConnection = titleBar:GetAttribute("MinimizeConnection")
+        if existingConnection then
+            existingConnection:Disconnect()
+        end
+        
+        local connection
+        connection = titleBar.MouseButton1Click:Connect(function()
+            -- If we're minimized, expand
+            if frame.Size.Y.Offset <= 30 then
+                UIEffects.expandFrame(frame, originalSize, originalPos, childrenStates)
+                connection:Disconnect()
+            end
+        end)
+        
+        -- Store connection
+        titleBar:SetAttribute("MinimizeConnection", connection)
+    end
+    
+    return minimizeTween
+end
+
+-- Expand frame animation
+function UIEffects.expandFrame(frame, originalSize, originalPos, childrenStates)
+    if not frame then return end
+    
+    -- Create expand tween
+    local tweenInfo = TweenInfo.new(
+        0.5,
+        EASE_STYLES.InOut,
+        EASE_DIRECTIONS.InOut
+    )
+    
+    local expandGoals = {
+        Size = originalSize,
+        Position = originalPos
+    }
+    
+    local expandTween = TweenService:Create(frame, tweenInfo, expandGoals)
+    expandTween:Play()
+    
+    -- Restore children visibility after tween
+    expandTween.Completed:Connect(function()
+        for child, wasVisible in pairs(childrenStates) do
+            if child and child.Parent then
+                child.Visible = wasVisible
+            end
+        end
+    end)
+    
+    return expandTween
+end
+
+------------------------------
+-- SpeedBoost Module
+------------------------------
+local SpeedBoost = {}
+
+-- Configuration
+local DEFAULT_SPEED_MULTIPLIER = 2
+local MAX_SPEED_MULTIPLIER = 3
+local BOOST_DURATION = 10 -- seconds
+local COOLDOWN_DURATION = 5 -- seconds
+
+-- State variables
+local speedBoostIsActive = false
+local originalWalkSpeed = 16 -- Default Roblox walk speed
+local speedMultiplier = DEFAULT_SPEED_MULTIPLIER
+local speedBoostTimer = 0
+local speedCooldownTimer = 0
+local speedInCooldown = false
+local speedEffectParts = {}
+
+-- Activate the speed boost
+function SpeedBoost.activate(player)
+    if speedBoostIsActive or speedInCooldown then
+        return false, "Speed boost is already active or in cooldown"
+    end
+    
+    -- Store original walk speed
+    local character = player.Character
+    if not character or not character:FindFirstChild("Humanoid") then
+        return false, "Character or Humanoid not found"
+    end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    originalWalkSpeed = humanoid.WalkSpeed
+    
+    -- Apply speed boost
+    humanoid.WalkSpeed = originalWalkSpeed * speedMultiplier
+    
+    -- Create visual effect
+    createSpeedEffect(character)
+    
+    -- Set state
+    speedBoostIsActive = true
+    speedBoostTimer = BOOST_DURATION
+    
+    -- Connect update function
+    local connection
+    connection = RunService.Heartbeat:Connect(function(deltaTime)
+        speedBoostTimer = speedBoostTimer - deltaTime
+        
+        if speedBoostTimer <= 0 then
+            SpeedBoost.deactivate(player)
+            connection:Disconnect()
+            
+            -- Start cooldown
+            speedInCooldown = true
+            speedCooldownTimer = COOLDOWN_DURATION
+            
+            local cooldownConnection
+            cooldownConnection = RunService.Heartbeat:Connect(function(dt)
+                speedCooldownTimer = speedCooldownTimer - dt
+                if speedCooldownTimer <= 0 then
+                    speedInCooldown = false
+                    cooldownConnection:Disconnect()
+                end
+            end)
+        end
+    end)
+    
+    return true, "Speed boost activated"
+end
+
+-- Deactivate the speed boost
+function SpeedBoost.deactivate(player)
+    if not speedBoostIsActive then
+        return false, "Speed boost is not active"
+    end
+    
+    local character = player.Character
+    if character and character:FindFirstChild("Humanoid") then
+        local humanoid = character:FindFirstChild("Humanoid")
+        humanoid.WalkSpeed = originalWalkSpeed
+    end
+    
+    -- Remove visual effects
+    removeSpeedEffect()
+    
+    speedBoostIsActive = false
+    return true, "Speed boost deactivated"
+end
+
+-- Create visual speed effect
+function createSpeedEffect(character)
+    -- Clean up any existing effects
+    removeSpeedEffect()
+    
+    -- Create trail effect on feet
+    local rightLeg = character:FindFirstChild("RightLeg") or character:FindFirstChild("Right Leg")
+    local leftLeg = character:FindFirstChild("LeftLeg") or character:FindFirstChild("Left Leg")
+    
+    if rightLeg then
+        local trail = Instance.new("Trail")
+        trail.Color = ColorSequence.new(Color3.fromRGB(0, 150, 255))
+        trail.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        trail.Lifetime = 0.5
+        trail.MinLength = 0.1
+        trail.Attachment0 = createAttachment(rightLeg, "Top")
+        trail.Attachment1 = createAttachment(rightLeg, "Bottom")
+        trail.Parent = rightLeg
+        table.insert(speedEffectParts, trail)
+    end
+    
+    if leftLeg then
+        local trail = Instance.new("Trail")
+        trail.Color = ColorSequence.new(Color3.fromRGB(0, 150, 255))
+        trail.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        trail.Lifetime = 0.5
+        trail.MinLength = 0.1
+        trail.Attachment0 = createAttachment(leftLeg, "Top")
+        trail.Attachment1 = createAttachment(leftLeg, "Bottom")
+        trail.Parent = leftLeg
+        table.insert(speedEffectParts, trail)
+    end
+    
+    -- Add particle effect
+    local torso = character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+    if torso then
+        local particleEmitter = Instance.new("ParticleEmitter")
+        particleEmitter.Color = ColorSequence.new(Color3.fromRGB(0, 150, 255))
+        particleEmitter.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.7),
+            NumberSequenceKeypoint.new(1, 1)
+        })
+        particleEmitter.Size = NumberSequence.new(0.5)
+        particleEmitter.Acceleration = Vector3.new(0, 0, 0)
+        particleEmitter.Lifetime = NumberRange.new(0.5, 1)
+        particleEmitter.Rate = 20
+        particleEmitter.Speed = NumberRange.new(3, 5)
+        particleEmitter.SpreadAngle = Vector2.new(25, 25)
+        particleEmitter.Parent = torso
+        table.insert(speedEffectParts, particleEmitter)
+    end
+end
+
+-- Create attachment for trail effect
+function createAttachment(part, name)
+    local attachment = Instance.new("Attachment")
+    attachment.Name = name .. "Attachment"
+    
+    if name == "Top" then
+        attachment.Position = Vector3.new(0, part.Size.Y/2, 0)
+    else
+        attachment.Position = Vector3.new(0, -part.Size.Y/2, 0)
+    end
+    
+    attachment.Parent = part
+    table.insert(speedEffectParts, attachment)
+    return attachment
+end
+
+-- Remove all visual effects
+function removeSpeedEffect()
+    for _, part in ipairs(speedEffectParts) do
+        pcall(function()
+            part:Destroy()
+        end)
+    end
+    speedEffectParts = {}
+end
+
+-- Per-frame update function
+function SpeedBoost.update(deltaTime, player)
+    if speedBoostIsActive then
+        local character = player.Character
+        if character then
+            -- Optional: Add additional visual effects here
+        end
+    end
+end
+
+------------------------------
+-- JumpBoost Module
+------------------------------
+local JumpBoost = {}
+
+-- Configuration
+local DEFAULT_JUMP_MULTIPLIER = 2
+local MAX_JUMP_MULTIPLIER = 4
+local JUMP_BOOST_DURATION = 15 -- seconds
+local JUMP_COOLDOWN_DURATION = 10 -- seconds
+
+-- State variables
+local jumpBoostIsActive = false
+local originalJumpPower = 50 -- Default Roblox jump power
+local jumpMultiplier = DEFAULT_JUMP_MULTIPLIER
+local jumpBoostTimer = 0
+local jumpCooldownTimer = 0
+local jumpInCooldown = false
+local jumpEffectParts = {}
+
+-- Activate the jump boost
+function JumpBoost.activate(player)
+    if jumpBoostIsActive or jumpInCooldown then
+        return false, "Jump boost is already active or in cooldown"
+    end
+    
+    -- Store original jump power
+    local character = player.Character
+    if not character or not character:FindFirstChild("Humanoid") then
+        return false, "Character or Humanoid not found"
+    end
+    
+    local humanoid = character:FindFirstChild("Humanoid")
+    originalJumpPower = humanoid.JumpPower
+    
+    -- Apply jump boost
+    humanoid.JumpPower = originalJumpPower * jumpMultiplier
+    
+    -- Create visual effect
+    createJumpEffect(character)
+    
+    -- Set state
+    jumpBoostIsActive = true
+    jumpBoostTimer = JUMP_BOOST_DURATION
+    
+    -- Connect update function
+    local connection
+    connection = RunService.Heartbeat:Connect(function(deltaTime)
+        jumpBoostTimer = jumpBoostTimer - deltaTime
+        
+        if jumpBoostTimer <= 0 then
+            JumpBoost.deactivate(player)
+            connection:Disconnect()
+            
+            -- Start cooldown
+            jumpInCooldown = true
+            jumpCooldownTimer = JUMP_COOLDOWN_DURATION
+            
+            local cooldownConnection
+            cooldownConnection = RunService.Heartbeat:Connect(function(dt)
+                jumpCooldownTimer = jumpCooldownTimer - dt
+                if jumpCooldownTimer <= 0 then
+                    jumpInCooldown = false
+                    cooldownConnection:Disconnect()
+                end
+            end)
+        end
+    end)
+    
+    return true, "Jump boost activated"
+end
+
+-- Deactivate the jump boost
+function JumpBoost.deactivate(player)
+    if not jumpBoostIsActive then
+        return false, "Jump boost is not active"
+    end
+    
+    local character = player.Character
+    if character and character:FindFirstChild("Humanoid") then
+        local humanoid = character:FindFirstChild("Humanoid")
+        humanoid.JumpPower = originalJumpPower
+    end
+    
+    -- Remove visual effects
+    removeJumpEffect()
+    
+    jumpBoostIsActive = false
+    return true, "Jump boost deactivated"
+end
+
+-- Create visual jump effect
+function createJumpEffect(character)
+    -- Clean up any existing effects
+    removeJumpEffect()
+    
+    -- Create particles on feet
+    local rightFoot = character:FindFirstChild("RightFoot") or character:FindFirstChild("Right Foot")
+    local leftFoot = character:FindFirstChild("LeftFoot") or character:FindFirstChild("Left Foot")
+    
+    local function createFootParticle(part)
+        if part then
+            local particleEmitter = Instance.new("ParticleEmitter")
+            particleEmitter.Color = ColorSequence.new(Color3.fromRGB(0, 255, 100))
+            particleEmitter.Transparency = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0.5),
+                NumberSequenceKeypoint.new(1, 1)
+            })
+            particleEmitter.Size = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, 0.5),
+                NumberSequenceKeypoint.new(1, 0)
+            })
+            particleEmitter.Acceleration = Vector3.new(0, -10, 0)
+            particleEmitter.Lifetime = NumberRange.new(0.5, 1)
+            particleEmitter.Rate = 10
+            particleEmitter.Speed = NumberRange.new(2, 5)
+            particleEmitter.SpreadAngle = Vector2.new(35, 35)
+            particleEmitter.Parent = part
+            table.insert(jumpEffectParts, particleEmitter)
+        end
+    end
+    
+    createFootParticle(rightFoot)
+    createFootParticle(leftFoot)
+    
+    -- Create jump detector to emit burst on jump
+    local humanoid = character:FindFirstChild("Humanoid")
+    if humanoid then
+        local stateConnection
+        stateConnection = humanoid.StateChanged:Connect(function(oldState, newState)
+            if newState == Enum.HumanoidStateType.Jumping then
+                -- Create burst effect
+                local rootPart = character:FindFirstChild("HumanoidRootPart")
+                if rootPart then
+                    local burstEffect = Instance.new("ParticleEmitter")
+                    burstEffect.Color = ColorSequence.new(Color3.fromRGB(0, 255, 100))
+                    burstEffect.Transparency = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, 0.2),
+                        NumberSequenceKeypoint.new(1, 1)
+                    })
+                    burstEffect.Size = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, 1),
+                        NumberSequenceKeypoint.new(1, 3)
+                    })
+                    burstEffect.Lifetime = NumberRange.new(0.5, 1)
+                    burstEffect.Speed = NumberRange.new(5, 10)
+                    burstEffect.Acceleration = Vector3.new(0, -15, 0)
+                    burstEffect.SpreadAngle = Vector2.new(180, 180)
+                    burstEffect.EmissionDirection = Enum.NormalId.Bottom
+                    burstEffect.Rate = 0 -- Use Emit instead of continuous
+                    burstEffect.Parent = rootPart
+                    
+                    -- Emit a burst
+                    burstEffect:Emit(30)
+                    
+                    -- Remove after effect finishes
+                    delay(1, function()
+                        if burstEffect and burstEffect.Parent then
+                            burstEffect:Destroy()
+                        end
+                    end)
+                end
+            end
+        end)
+        
+        -- Store connection to disconnect later
+        table.insert(jumpEffectParts, {
+            disconnect = function()
+                stateConnection:Disconnect()
+            end
+        })
+    end
+end
+
+-- Remove all visual effects
+function removeJumpEffect()
+    for _, part in ipairs(jumpEffectParts) do
+        pcall(function()
+            if typeof(part) == "table" and part.disconnect then
+                part.disconnect()
+            else
+                part:Destroy()
+            end
+        end)
+    end
+    jumpEffectParts = {}
+end
+
+-- Per-frame update function
+function JumpBoost.update(deltaTime, player)
+    if jumpBoostIsActive then
+        local character = player.Character
+        if character then
+            -- Optional: Add additional visual effects here
+        end
+    end
+end
+
+------------------------------
+-- WallHack Module
+------------------------------
+local WallHack = {}
+
+-- Configuration
+local WALL_TRANSPARENCY = 0.7
+local HIGHLIGHT_COLOR = Color3.fromRGB(255, 150, 0)
+local ACTIVATION_DISTANCE = 30 -- only make walls transparent within this distance
+local REFRESH_RATE = 0.5 -- seconds between transparency updates
+
+-- State variables
+local wallHackIsActive = false
+local affectedParts = {}
+local originalProperties = {}
+local wallUpdateTimer = 0
+
+-- Activate the wall hack
+function WallHack.activate(player)
+    if wallHackIsActive then
+        return false, "Wall hack is already active"
+    end
+    
+    wallHackIsActive = true
+    updateWallTransparency(player)
+    
+    return true, "Wall hack activated"
+end
+
+-- Deactivate the wall hack
+function WallHack.deactivate(player)
+    if not wallHackIsActive then
+        return false, "Wall hack is not active"
+    end
+    
+    -- Restore original properties
+    for part, properties in pairs(originalProperties) do
+        if part and part:IsA("BasePart") and part.Parent then
+            pcall(function()
+                part.Transparency = properties.Transparency
+                part.LocalTransparencyModifier = 0
+                
+                -- Remove highlight if it exists
+                local highlight = part:FindFirstChild("WallHackHighlight")
+                if highlight then
+                    highlight:Destroy()
+                end
+            end)
+        end
+    end
+    
+    -- Clear tables
+    affectedParts = {}
+    originalProperties = {}
+    
+    wallHackIsActive = false
+    return true, "Wall hack deactivated"
+end
+
+-- Update wall transparency based on player position
+function updateWallTransparency(player)
+    -- Only proceed if active
+    if not wallHackIsActive then return end
+    
+    local character = player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    local camera = Workspace.CurrentCamera
+    local playerPosition = rootPart.Position
+    
+    -- Reset previously affected parts
+    for part, _ in pairs(affectedParts) do
+        if part and part:IsA("BasePart") and part.Parent then
+            pcall(function()
+                -- Skip if the part is already being processed
+                if not originalProperties[part] then
+                    return
+                end
+                
+                part.Transparency = originalProperties[part].Transparency
+                part.LocalTransparencyModifier = 0
+                
+                -- Remove highlight if it exists
+                local highlight = part:FindFirstChild("WallHackHighlight")
+                if highlight then
+                    highlight:Destroy()
+                end
+            end)
+        end
+    end
+    
+    -- Clear the affected parts table for the new update
+    affectedParts = {}
+    
+    -- Get all walls/parts between player and camera
+    local function isObstructingPart(part)
+        -- Skip certain kinds of parts
+        if part:IsA("Terrain") or part.Name == "HumanoidRootPart" or part.Transparency > 0.9 then
+            return false
+        end
+        
+        -- Skip character parts
+        if part:IsDescendantOf(character) then
+            return false
+        end
+        
+        -- Skip tools/models that aren't "wall-like"
+        if part.Parent:FindFirstChild("Humanoid") or part.Parent.Parent:FindFirstChild("Humanoid") then
+            return false
+        end
+        
+        -- Only include parts within activation distance
+        if (part.Position - playerPosition).Magnitude > ACTIVATION_DISTANCE then
+            return false
+        end
+        
+        -- Check if the part is between player and camera
+        local cameraPosition = camera.CFrame.Position
+        local direction = (cameraPosition - playerPosition).Unit
+        local rayParams = RaycastParams.new()
+        rayParams.FilterDescendantsInstances = {character}
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+        
+        local raycastResult = Workspace:Raycast(playerPosition, direction * ACTIVATION_DISTANCE, rayParams)
+        
+        if raycastResult and raycastResult.Instance == part then
+            return true
+        end
+        
+        -- Also check if the part blocks the view to important game objects
+        local importantObjects = getImportantObjects()
+        for _, object in ipairs(importantObjects) do
+            if object and object:IsA("BasePart") then
+                local objectDirection = (object.Position - playerPosition).Unit
+                local rayResult = Workspace:Raycast(playerPosition, objectDirection * ACTIVATION_DISTANCE, rayParams)
+                
+                if rayResult and rayResult.Instance == part then
+                    return true
+                end
+            end
+        end
+        
+        return false
+    end
+    
+    -- Get parts in the player's surroundings
+    local parts = Workspace:GetPartBoundsInRadius(playerPosition, ACTIVATION_DISTANCE)
+    
+    for _, part in ipairs(parts) do
+        if isObstructingPart(part) then
+            -- Store original properties if not already stored
+            if not originalProperties[part] then
+                originalProperties[part] = {
+                    Transparency = part.Transparency
+                }
+            end
+            
+            -- Make the part semi-transparent
+            part.Transparency = math.max(part.Transparency, WALL_TRANSPARENCY)
+            part.LocalTransparencyModifier = WALL_TRANSPARENCY
+            
+            -- Add highlight effect
+            local highlight = part:FindFirstChild("WallHackHighlight")
+            if not highlight then
+                highlight = Instance.new("Highlight")
+                highlight.Name = "WallHackHighlight"
+                highlight.FillColor = HIGHLIGHT_COLOR
+                highlight.OutlineColor = HIGHLIGHT_COLOR
+                highlight.FillTransparency = 0.7
+                highlight.OutlineTransparency = 0.2
+                highlight.Parent = part
+            end
+            
+            -- Mark as affected
+            affectedParts[part] = true
+        end
+    end
+end
+
+-- Get important game objects that should be visible through walls
+function getImportantObjects()
+    local objects = {}
+    
+    -- Add all other players
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            table.insert(objects, player.Character.HumanoidRootPart)
+        end
+    end
+    
+    -- Add game-specific objects (modify this for your specific game)
+    local collectibles = Workspace:FindFirstChild("Collectibles")
+    if collectibles then
+        for _, collectible in ipairs(collectibles:GetChildren()) do
+            if collectible:IsA("BasePart") then
+                table.insert(objects, collectible)
+            elseif collectible:FindFirstChildOfClass("BasePart") then
+                table.insert(objects, collectible:FindFirstChildOfClass("BasePart"))
+            end
+        end
+    end
+    
+    -- Add objectives or important locations
+    local objectives = Workspace:FindFirstChild("Objectives") or Workspace:FindFirstChild("GameObjects")
+    if objectives then
+        for _, objective in ipairs(objectives:GetChildren()) do
+            if objective:IsA("BasePart") then
+                table.insert(objects, objective)
+            elseif objective:FindFirstChildOfClass("BasePart") then
+                table.insert(objects, objective:FindFirstChildOfClass("BasePart"))
+            end
+        end
+    end
+    
+    return objects
+end
+
+-- Per-frame update function
+function WallHack.update(deltaTime, player)
+    if wallHackIsActive then
+        wallUpdateTimer = wallUpdateTimer + deltaTime
+        
+        if wallUpdateTimer >= REFRESH_RATE then
+            wallUpdateTimer = 0
+            updateWallTransparency(player)
+        end
+    end
+end
+
+------------------------------
+-- ESP Module
+------------------------------
+local ESP = {}
+
+-- Configuration
+local PLAYER_COLOR = Color3.fromRGB(255, 0, 0)
+local FRIENDLY_COLOR = Color3.fromRGB(0, 255, 0)
+local ITEM_COLOR = Color3.fromRGB(255, 255, 0)
+local OBJECTIVE_COLOR = Color3.fromRGB(0, 150, 255)
+local UPDATE_INTERVAL = 0.1 -- seconds
+local MAX_DISPLAY_DISTANCE = 500 -- studs
+
+-- State variables
+local espIsActive = false
+local espUpdateTimer = 0
+local espObjects = {}
+local highlightedObjects = {}
+
+-- Activate ESP
+function ESP.activate(player)
+    if espIsActive then
+        return false, "ESP is already active"
+    end
+    
+    espIsActive = true
+    updateESP(player)
+    
+    return true, "ESP activated"
+end
+
+-- Deactivate ESP
+function ESP.deactivate(player)
+    if not espIsActive then
+        return false, "ESP is not active"
+    end
+    
+    -- Remove all ESP elements
+    for object, espInfo in pairs(highlightedObjects) do
+        if espInfo.highlight and espInfo.highlight.Parent then
+            espInfo.highlight:Destroy()
+        end
+        
+        if espInfo.billboard and espInfo.billboard.Parent then
+            espInfo.billboard:Destroy()
+        end
+    end
+    
+    highlightedObjects = {}
+    espIsActive = false
+    
+    return true, "ESP deactivated"
+end
+
+-- Update ESP highlights and billboards
+function updateESP(player)
+    -- Only proceed if active
+    if not espIsActive then return end
+    
+    local myCharacter = player.Character
+    local myTeam = player.Team
+    local myPosition = myCharacter and myCharacter:FindFirstChild("HumanoidRootPart") and
+                       myCharacter.HumanoidRootPart.Position
+    
+    if not myPosition then return end
+    
+    -- Identify objects to highlight
+    espObjects = {}
+    
+    -- Add players
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character and
+           otherPlayer.Character:FindFirstChild("HumanoidRootPart") and
+           otherPlayer.Character:FindFirstChild("Humanoid") then
+            
+            local character = otherPlayer.Character
+            local position = character.HumanoidRootPart.Position
+            local distance = (position - myPosition).Magnitude
+            
+            if distance <= MAX_DISPLAY_DISTANCE then
+                local health = character.Humanoid.Health
+                local maxHealth = character.Humanoid.MaxHealth
+                local healthPercent = math.floor((health / maxHealth) * 100)
+                
+                -- Determine if friend or foe
+                local isFriendly = false
+                if Teams and #Teams:GetTeams() > 0 then
+                    isFriendly = otherPlayer.Team == myTeam
+                end
+                
+                table.insert(espObjects, {
+                    object = character,
+                    type = "player",
+                    color = isFriendly and FRIENDLY_COLOR or PLAYER_COLOR,
+                    text = otherPlayer.Name .. " [" .. healthPercent .. "%]",
+                    distance = distance
+                })
+            end
+        end
+    end
+    
+    -- Add collectible items
+    local collectibles = Workspace:FindFirstChild("Collectibles")
+    if collectibles then
+        for _, item in ipairs(collectibles:GetDescendants()) do
+            if item:IsA("BasePart") then
+                local position = item.Position
+                local distance = (position - myPosition).Magnitude
+                
+                if distance <= MAX_DISPLAY_DISTANCE then
+                    table.insert(espObjects, {
+                        object = item,
+                        type = "item",
+                        color = ITEM_COLOR,
+                        text = item.Name,
+                        distance = distance
+                    })
+                end
+            end
+        end
+    end
+    
+    -- Add objectives or important locations
+    local objectives = Workspace:FindFirstChild("Objectives") or 
+                      Workspace:FindFirstChild("GameObjects")
+    if objectives then
+        for _, objective in ipairs(objectives:GetDescendants()) do
+            if objective:IsA("BasePart") then
+                local position = objective.Position
+                local distance = (position - myPosition).Magnitude
+                
+                if distance <= MAX_DISPLAY_DISTANCE then
+                    table.insert(espObjects, {
+                        object = objective,
+                        type = "objective",
+                        color = OBJECTIVE_COLOR,
+                        text = objective.Name,
+                        distance = distance
+                    })
+                end
+            end
+        end
+    end
+    
+    -- Track objects that are no longer in the ESP list to remove them
+    local objectsToRemove = {}
+    for object, _ in pairs(highlightedObjects) do
+        local found = false
+        for _, espInfo in ipairs(espObjects) do
+            if espInfo.object == object then
+                found = true
+                break
+            end
+        end
+        
+        if not found then
+            objectsToRemove[object] = true
+        end
+    end
+    
+    -- Remove old objects
+    for object, _ in pairs(objectsToRemove) do
+        if highlightedObjects[object] then
+            if highlightedObjects[object].highlight then
+                highlightedObjects[object].highlight:Destroy()
+            end
+            
+            if highlightedObjects[object].billboard then
+                highlightedObjects[object].billboard:Destroy()
+            end
+            
+            highlightedObjects[object] = nil
+        end
+    end
+    
+    -- Update or create ESP elements for current objects
+    for _, espInfo in ipairs(espObjects) do
+        local object = espInfo.object
+        
+        -- Create or update highlight
+        if not highlightedObjects[object] then
+            highlightedObjects[object] = {}
+        end
+        
+        local highlight = highlightedObjects[object].highlight
+        if not highlight or not highlight.Parent then
+            highlight = Instance.new("Highlight")
+            highlight.FillColor = espInfo.color
+            highlight.OutlineColor = espInfo.color
+            highlight.FillTransparency = 0.5
+            highlight.OutlineTransparency = 0
+            highlight.Parent = object
+            highlightedObjects[object].highlight = highlight
+        else
+            highlight.FillColor = espInfo.color
+            highlight.OutlineColor = espInfo.color
+        end
+        
+        -- Create or update billboard
+        local billboard = highlightedObjects[object].billboard
+        if not billboard or not billboard.Parent then
+            billboard = Instance.new("BillboardGui")
+            billboard.Size = UDim2.new(0, 200, 0, 50)
+            billboard.StudsOffset = Vector3.new(0, 2, 0)
+            billboard.AlwaysOnTop = true
+            billboard.LightInfluence = 0
+            
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Size = UDim2.new(1, 0, 1, 0)
+            textLabel.BackgroundTransparency = 1
+            textLabel.TextColor3 = espInfo.color
+            textLabel.TextStrokeTransparency = 0.5
+            textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+            textLabel.Font = Enum.Font.SourceSansBold
+            textLabel.TextScaled = true
+            textLabel.Parent = billboard
+            
+            billboard.Parent = object
+            highlightedObjects[object].billboard = billboard
+            highlightedObjects[object].textLabel = textLabel
+        end
+        
+        -- Update billboard text with distance
+        local distanceText = math.floor(espInfo.distance) .. "m"
+        highlightedObjects[object].textLabel.Text = espInfo.text .. " [" .. distanceText .. "]"
+    end
+end
+
+-- Per-frame update function
+function ESP.update(deltaTime, player)
+    if espIsActive then
+        espUpdateTimer = espUpdateTimer + deltaTime
+        
+        if espUpdateTimer >= UPDATE_INTERVAL then
+            espUpdateTimer = 0
+            updateESP(player)
+        end
+    end
+end
+
+------------------------------
+-- Teleport Module
+------------------------------
+local Teleport = {}
+
+-- Configuration
+local TELEPORT_COOLDOWN = 5 -- seconds
+local MAX_CUSTOM_LOCATIONS = 5
+local ANIMATION_DURATION = 1 -- seconds
+
+-- State variables
+local teleportIsActive = false
+local cooldownRemaining = 0
+local teleportInCooldown = false
+local customLocations = {}
+local presetLocations = {} -- Will be populated once the game's map is detected
+local teleportEffect = nil
+
+-- Activate teleport feature
+function Teleport.activate(player)
+    if teleportIsActive then
+        return false, "Teleport feature is already active"
+    end
+    
+    -- Detect the game's map and add preset locations
+    detectGamePresets()
+    
+    teleportIsActive = true
+    return true, "Teleport feature activated"
+end
+
+-- Deactivate teleport feature
+function Teleport.deactivate(player)
+    if not teleportIsActive then
+        return false, "Teleport feature is not active"
+    end
+    
+    teleportIsActive = false
+    
+    -- Clean up any teleport effects
+    if teleportEffect and teleportEffect.Parent then
+        teleportEffect:Destroy()
+        teleportEffect = nil
+    end
+    
+    return true, "Teleport feature deactivated"
+end
+
+-- Add a custom location
+function Teleport.addCustomLocation(name, position)
+    if #customLocations >= MAX_CUSTOM_LOCATIONS then
+        return false, "Maximum number of custom locations reached"
+    end
+    
+    -- Check if name already exists
+    for _, location in ipairs(customLocations) do
+        if location.name == name then
+            return false, "Location with this name already exists"
+        end
+    end
+    
+    table.insert(customLocations, {
+        name = name,
+        position = position,
+        custom = true
+    })
+    
+    return true, "Custom location added: " .. name
+end
+
+-- Save current position as a custom location
+function Teleport.saveCurrentLocation(player, name)
+    local character = player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then
+        return false, "Character or HumanoidRootPart not found"
+    end
+    
+    local position = character.HumanoidRootPart.Position
+    return Teleport.addCustomLocation(name, position)
+end
+
+-- Teleport to a location by name
+function Teleport.teleportToLocation(player, locationName)
+    if not teleportIsActive then
+        return false, "Teleport feature is not active"
+    end
+    
+    if teleportInCooldown then
+        return false, "Teleport is on cooldown for " .. math.ceil(cooldownRemaining) .. " seconds"
+    end
+    
+    local character = player.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") or not character:FindFirstChild("Humanoid") then
+        return false, "Character, HumanoidRootPart, or Humanoid not found"
+    end
+    
+    -- Find the location
+    local targetLocation = nil
+    
+    -- Check custom locations
+    for _, location in ipairs(customLocations) do
+        if location.name == locationName then
+            targetLocation = location
+            break
+        end
+    end
+    
+    -- Check preset locations if not found in custom
+    if not targetLocation then
+        for _, location in ipairs(presetLocations) do
+            if location.name == locationName then
+                targetLocation = location
+                break
+            end
+        end
+    end
+    
+    if not targetLocation then
+        return false, "Location not found: " .. locationName
+    end
+    
+    -- Start teleport animation and process
+    local humanoid = character.Humanoid
+    local rootPart = character.HumanoidRootPart
+    
+    -- Disable controls temporarily
+    humanoid.WalkSpeed = 0
+    
+    -- Create teleport effect
+    createTeleportEffect(character)
+    
+    -- Start the teleport animation
+    local startPos = rootPart.Position
+    local endPos = targetLocation.position
+    
+    local tweenInfo = TweenInfo.new(
+        ANIMATION_DURATION,
+        Enum.EasingStyle.Sine,
+        Enum.EasingDirection.InOut
+    )
+    
+    -- First, teleport slightly up to show "charging" effect
+    local upOffset = Vector3.new(0, 3, 0)
+    local upTween = TweenService:Create(rootPart, tweenInfo, {
+        CFrame = CFrame.new(startPos + upOffset)
+    })
+    
+    upTween:Play()
+    
+    upTween.Completed:Connect(function()
+        -- Then teleport to the target
+        rootPart.CFrame = CFrame.new(endPos + Vector3.new(0, 3, 0))
+        
+        -- Clean up effects
+        if teleportEffect and teleportEffect.Parent then
+            teleportEffect:Destroy()
+            teleportEffect = nil
+        end
+        
+        -- Create arrival effect
+        createArrivalEffect(character)
+        
+        -- Start cooldown
+        teleportInCooldown = true
+        cooldownRemaining = TELEPORT_COOLDOWN
+        
+        -- Enable controls again
+        humanoid.WalkSpeed = 16
+    end)
+    
+    return true, "Teleporting to " .. targetLocation.name
+end
+
+-- Create teleport effect
+function createTeleportEffect(character)
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    -- Clean up existing effect
+    if teleportEffect and teleportEffect.Parent then
+        teleportEffect:Destroy()
+    end
+    
+    -- Create effect
+    teleportEffect = Instance.new("ParticleEmitter")
+    teleportEffect.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 60, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(140, 140, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 60, 255))
+    })
+    teleportEffect.Size = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(0.5, 2),
+        NumberSequenceKeypoint.new(1, 1)
+    })
+    teleportEffect.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.2),
+        NumberSequenceKeypoint.new(1, 1)
+    })
+    teleportEffect.Speed = NumberRange.new(5, 10)
+    teleportEffect.Lifetime = NumberRange.new(0.5, 1)
+    teleportEffect.Rate = 50
+    teleportEffect.SpreadAngle = Vector2.new(180, 180)
+    teleportEffect.Parent = rootPart
+end
+
+-- Create arrival effect
+function createArrivalEffect(character)
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local arrivalEffect = Instance.new("ParticleEmitter")
+    arrivalEffect.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 255, 180)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(140, 255, 200)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 255, 180))
+    })
+    arrivalEffect.Size = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0),
+        NumberSequenceKeypoint.new(0.2, 3),
+        NumberSequenceKeypoint.new(1, 0)
+    })
+    arrivalEffect.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0),
+        NumberSequenceKeypoint.new(0.8, 0.5),
+        NumberSequenceKeypoint.new(1, 1)
+    })
+    arrivalEffect.Speed = NumberRange.new(15, 25)
+    arrivalEffect.Acceleration = Vector3.new(0, -10, 0)
+    arrivalEffect.Lifetime = NumberRange.new(1, 2)
+    arrivalEffect.Rate = 0 -- Use emit instead of continuous
+    arrivalEffect.SpreadAngle = Vector2.new(180, 180)
+    arrivalEffect.Parent = rootPart
+    
+    -- Emit a burst then destroy
+    arrivalEffect:Emit(100)
+    
+    delay(2, function()
+        if arrivalEffect and arrivalEffect.Parent then
+            arrivalEffect:Destroy()
+        end
+    end)
+end
+
+-- Detect the game's map and create preset locations
+function detectGamePresets()
+    -- Clear existing presets
+    presetLocations = {}
+    
+    -- Try to detect map type by looking for common elements
+    local mapName = "Unknown"
+    local detectedLocations = {}
+    
+    -- Look for spawn locations
+    local spawns = Workspace:FindFirstChild("Spawns") or Workspace:FindFirstChild("SpawnLocations")
+    if spawns then
+        for _, spawn in ipairs(spawns:GetChildren()) do
+            if spawn:IsA("BasePart") or spawn:IsA("SpawnLocation") then
+                table.insert(detectedLocations, {
+                    name = "Spawn_" .. spawn.Name,
+                    position = spawn.Position,
+                    custom = false
+                })
+            end
+        end
+    end
+    
+    -- Look for key locations in the map
+    local keyLocations = {
+        "Shop", "Store", "Base", "Hub", "Lobby", "Arena", "Stadium", 
+        "Center", "Treasure", "Chest", "Boss", "SafeZone"
+    }
+    
+    for _, locationName in ipairs(keyLocations) do
+        local location = Workspace:FindFirstChild(locationName)
+        if location then
+            if location:IsA("BasePart") then
+                table.insert(detectedLocations, {
+                    name = locationName,
+                    position = location.Position,
+                    custom = false
+                })
+            elseif location:FindFirstChildOfClass("BasePart") then
+                table.insert(detectedLocations, {
+                    name = locationName,
+                    position = location:FindFirstChildOfClass("BasePart").Position,
+                    custom = false
+                })
+            end
+        end
+    end
+    
+    -- If we found less than 3 preset locations, add some generic ones based on workspace structure
+    if #detectedLocations < 3 then
+        -- Find the highest point in the map
+        local highestY = -math.huge
+        local highestPos = Vector3.new(0, 0, 0)
+        
+        -- Find the center of the map
+        local mapCenter = Vector3.new(0, 0, 0)
+        local partCount = 0
+        
+        for _, child in ipairs(Workspace:GetDescendants()) do
+            if child:IsA("BasePart") and not child:IsDescendantOf(Players.LocalPlayer.Character) then
+                -- Check for highest point
+                if child.Position.Y > highestY then
+                    highestY = child.Position.Y
+                    highestPos = child.Position + Vector3.new(0, 5, 0)
+                end
+                
+                -- Add to center calculation
+                mapCenter = mapCenter + child.Position
+                partCount = partCount + 1
+            end
+        end
+        
+        if partCount > 0 then
+            mapCenter = mapCenter / partCount
+            
+            table.insert(detectedLocations, {
+                name = "Map Center",
+                position = mapCenter,
+                custom = false
+            })
+            
+            table.insert(detectedLocations, {
+                name = "Highest Point",
+                position = highestPos,
+                custom = false
+            })
+        end
+    end
+    
+    -- Add detected locations to our preset list
+    for _, location in ipairs(detectedLocations) do
+        table.insert(presetLocations, location)
+    end
+end
+
+-- Get all available teleport locations
+function Teleport.getLocations()
+    local allLocations = {}
+    
+    -- Add preset locations
+    for _, location in ipairs(presetLocations) do
+        table.insert(allLocations, {
+            name = location.name,
+            isCustom = false
+        })
+    end
+    
+    -- Add custom locations
+    for _, location in ipairs(customLocations) do
+        table.insert(allLocations, {
+            name = location.name,
+            isCustom = true
+        })
+    end
+    
+    return allLocations
+end
+
+-- Per-frame update function
+function Teleport.update(deltaTime, player)
+    if teleportIsActive and teleportInCooldown then
+        cooldownRemaining = cooldownRemaining - deltaTime
+        
+        if cooldownRemaining <= 0 then
+            teleportInCooldown = false
+            cooldownRemaining = 0
+        end
+    end
+end
+
+------------------------------
+-- General Variables and State
+------------------------------
+local guiCreated = false
+local screenGui = nil
+local mainFrame = nil
+local activeFeatures = {}
+local activePage = "Home"
+local statusClearTimeout = nil
+
+-- Categories
+local categories = {
+    "Home",
+    "Movement",
+    "Vision",
+    "Utility",
+    "Automation",
+    "Settings"
+}
+
+-- Feature definitions
+local features = {
+    {
+        name = "Speed Boost",
+        description = "Increase your movement speed",
+        module = SpeedBoost,
+        icon = "SpeedIcon",
+        category = "Movement",
+        keyBind = "LeftShift"
+    },
+    {
+        name = "Jump Boost",
+        description = "Jump higher than normal",
+        module = JumpBoost,
+        icon = "JumpIcon",
+        category = "Movement",
+        keyBind = "Space"
+    },
+    {
+        name = "Wall Hack",
+        description = "See through walls",
+        module = WallHack,
+        icon = "WallIcon",
+        category = "Vision",
+        keyBind = "V"
+    },
+    {
+        name = "ESP",
+        description = "Highlight players and items",
+        module = ESP,
+        icon = "ESPIcon",
+        category = "Vision",
+        keyBind = "E"
+    },
+    {
+        name = "Teleport",
+        description = "Teleport to selected locations",
+        module = Teleport,
+        icon = "TeleportIcon",
+        category = "Utility",
+        keyBind = "T"
+    }
+}
+
+------------------------------
+-- Helper Functions
+------------------------------
+
+-- Set status bar text with auto-clear
+function setStatus(text)
+    if not mainFrame then return end
+    local statusBar = mainFrame:FindFirstChild("StatusBar")
+    if not statusBar then return end
+    local statusText = statusBar:FindFirstChild("StatusText")
+    if not statusText then return end
+    
+    statusText.Text = text
+    
+    -- Clear previous timeout if it exists
+    if statusClearTimeout then
+        pcall(function() 
+            statusClearTimeout:Disconnect()
+        end)
+    end
+    
+    -- Set new timeout to clear text after 5 seconds
+    statusClearTimeout = delay(5, function()
+        if statusText then
+            statusText.Text = "Ready"
+        end
+    end)
+end
+
+-- Toggle a feature on/off
+function toggleFeature(featureName)
+    for _, feature in ipairs(features) do
+        if feature.name == featureName then
+            local isActive = not (activeFeatures[featureName] or false)
+            
+            -- Try to activate/deactivate the feature
+            local success, result
+            
+            if isActive then
+                success, result = pcall(function()
+                    return feature.module.activate(player)
+                end)
+            else
+                success, result = pcall(function()
+                    return feature.module.deactivate(player)
+                end)
+            end
+            
+            if success then
+                activeFeatures[featureName] = isActive
+                
+                -- Find and update the feature button
+                for _, categoryName in ipairs(categories) do
+                    local categoryPage = mainFrame:FindFirstChild("Content"):FindFirstChild(categoryName.."Page")
+                    if categoryPage then
+                        local featureButton = categoryPage:FindFirstChild(featureName.."Button")
+                        if featureButton then
+                            if isActive then
+                                featureButton.BackgroundColor3 = Color3.fromRGB(60, 200, 60)
+                                setStatus(featureName .. " activated!")
+                            else
+                                featureButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+                                setStatus(featureName .. " deactivated")
+                            end
+                        end
+                    end
+                end
+                
+                -- Update home page if it's active
+                if activePage == "Home" then
+                    updateHomePageStats()
+                end
+            else
+                warn("Error toggling feature " .. featureName .. ": " .. tostring(result))
+                setStatus("Error: Could not toggle " .. featureName)
+            end
+            
+            break
+        end
+    end
+end
+
+-- Switch between pages
+function switchPage(pageName)
+    activePage = pageName
+    
+    -- Update navigation button states
+    for _, category in ipairs(categories) do
+        local button = mainFrame:FindFirstChild("Navigation"):FindFirstChild(category.."Button")
+        if button then
+            if category == pageName then
+                button.BackgroundColor3 = Color3.fromRGB(60, 120, 255)
+                button.TextColor3 = Color3.fromRGB(255, 255, 255)
+            else
+                button.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+                button.TextColor3 = Color3.fromRGB(200, 200, 200)
+            end
+        end
+    end
+    
+    -- Clear content frame
+    local contentFrame = mainFrame:FindFirstChild("Content")
+    for _, child in pairs(contentFrame:GetChildren()) do
+        if child:IsA("Frame") or child:IsA("ScrollingFrame") then
+            child.Visible = false
+        end
+    end
+    
+    -- Show appropriate content
+    local pageFrame = contentFrame:FindFirstChild(pageName.."Page")
+    if pageFrame then
+        pageFrame.Visible = true
+        
+        -- If home page, update feature status
+        if pageName == "Home" then
+            updateHomePageStats()
+        end
+    end
+    
+    setStatus("Switched to " .. pageName .. " page")
+end
+
+-- Update home page statistics and active features
+function updateHomePageStats()
+    local homePage = mainFrame:FindFirstChild("Content"):FindFirstChild("HomePage")
+    if homePage then
+        local activeCount = 0
+        
+        -- Update active features
+        for _, feature in ipairs(features) do
+            if activeFeatures[feature.name] then
+                activeCount = activeCount + 1
+            end
+        end
+        
+        -- Update stats
+        local statsFrame = homePage:FindFirstChild("StatsFrame")
+        if statsFrame then
+            local activeFeatures = statsFrame:FindFirstChild("ActiveFeatures")
+            if activeFeatures then
+                activeFeatures.Text = "Active Features: " .. activeCount .. "/" .. #features
+            end
+        end
+    end
+end
+
+-- Toggle GUI visibility
+function toggleGui()
+    if not mainFrame then return end
+    
+    local isGuiVisible = mainFrame.Visible
+    isGuiVisible = not isGuiVisible
+    
+    if isGuiVisible then
+        mainFrame.Visible = true
+        UIEffects.fadeIn(mainFrame)
+    else
+        UIEffects.fadeOut(mainFrame, function()
+            mainFrame.Visible = false
+        end)
+    end
+end
+
+------------------------------
+-- Create GUI Elements
+------------------------------
+function createGui()
+    if guiCreated then return end
+    
+    -- Create ScreenGui
+    screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "CheatGUI"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    -- Create main frame
+    mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 600, 0, 350)
+    mainFrame.Position = UDim2.new(0.5, -300, 0.5, -175)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    mainFrame.BorderSizePixel = 0
+    mainFrame.ClipsDescendants = true
+    mainFrame.Visible = false
+    
+    -- Add corner radius
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = mainFrame
+    
+    -- Create title bar
+    local titleBar = Instance.new("Frame")
+    titleBar.Name = "TitleBar"
+    titleBar.Size = UDim2.new(1, 0, 0, 30)
+    titleBar.Position = UDim2.new(0, 0, 0, 0)
+    titleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    titleBar.BorderSizePixel = 0
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 6)
+    titleCorner.Parent = titleBar
+    
+    local titleBottomFrame = Instance.new("Frame")
+    titleBottomFrame.Size = UDim2.new(1, 0, 0, 15)
+    titleBottomFrame.Position = UDim2.new(0, 0, 1, -15)
+    titleBottomFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    titleBottomFrame.BorderSizePixel = 0
+    titleBottomFrame.ZIndex = 0
+    titleBottomFrame.Parent = titleBar
+    
+    local title = Instance.new("TextLabel")
+    title.Name = "Title"
+    title.Size = UDim2.new(1, -120, 1, 0)
+    title.Position = UDim2.new(0, 10, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "PowerPlay GUI"
+    title.TextColor3 = Color3.fromRGB(240, 240, 240)
+    title.Font = Enum.Font.SourceSansBold
+    title.TextSize = 18
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = titleBar
+    
+    -- Close button
+    local closeButton = Instance.new("TextButton")
+    closeButton.Name = "CloseButton"
+    closeButton.Size = UDim2.new(0, 30, 0, 30)
+    closeButton.Position = UDim2.new(1, -30, 0, 0)
+    closeButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+    closeButton.Text = "X"
+    closeButton.TextColor3 = Color3.fromRGB(240, 240, 240)
+    closeButton.Font = Enum.Font.SourceSansBold
+    closeButton.TextSize = 18
+    closeButton.BorderSizePixel = 0
+    
+    local closeCorner = Instance.new("UICorner")
+    closeCorner.CornerRadius = UDim.new(0, 6)
+    closeCorner.Parent = closeButton
+    
+    closeButton.Parent = titleBar
+    
+    -- Minimize button
+    local minimizeButton = Instance.new("TextButton")
+    minimizeButton.Name = "MinimizeButton"
+    minimizeButton.Size = UDim2.new(0, 30, 0, 30)
+    minimizeButton.Position = UDim2.new(1, -70, 0, 0)
+    minimizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 180)
+    minimizeButton.Text = "_"
+    minimizeButton.TextColor3 = Color3.fromRGB(240, 240, 240)
+    minimizeButton.Font = Enum.Font.SourceSansBold
+    minimizeButton.TextSize = 18
+    minimizeButton.BorderSizePixel = 0
+    
+    local minimizeCorner = Instance.new("UICorner")
+    minimizeCorner.CornerRadius = UDim.new(0, 6)
+    minimizeCorner.Parent = minimizeButton
+    
+    minimizeButton.Parent = titleBar
+    
+    titleBar.Parent = mainFrame
+    
+    -- Create navigation sidebar
+    local navigationFrame = Instance.new("Frame")
+    navigationFrame.Name = "Navigation"
+    navigationFrame.Size = UDim2.new(0, 120, 1, -60)
+    navigationFrame.Position = UDim2.new(0, 0, 0, 30)
+    navigationFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+    navigationFrame.BorderSizePixel = 0
+    
+    -- Create navigation buttons
+    for i, category in ipairs(categories) do
+        local button = Instance.new("TextButton")
+        button.Name = category .. "Button"
+        button.Size = UDim2.new(1, 0, 0, 40)
+        button.Position = UDim2.new(0, 0, 0, (i-1) * 50)
+        button.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+        button.Text = category
+        button.TextColor3 = Color3.fromRGB(200, 200, 200)
+        button.Font = Enum.Font.SourceSansSemibold
+        button.TextSize = 16
+        button.BorderSizePixel = 0
+        
+        local buttonCorner = Instance.new("UICorner")
+        buttonCorner.CornerRadius = UDim.new(0, 4)
+        buttonCorner.Parent = button
+        
+        button.Parent = navigationFrame
+    end
+    
+    navigationFrame.Parent = mainFrame
+    
+    -- Create content frame
+    local contentFrame = Instance.new("Frame")
+    contentFrame.Name = "Content"
+    contentFrame.Size = UDim2.new(1, -120, 1, -60)
+    contentFrame.Position = UDim2.new(0, 120, 0, 30)
+    contentFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    contentFrame.BorderSizePixel = 0
+    
+    -- Create pages
+    for _, category in ipairs(categories) do
+        local page = Instance.new("Frame")
+        page.Name = category .. "Page"
+        page.Size = UDim2.new(1, 0, 1, 0)
+        page.BackgroundTransparency = 1
+        page.Visible = false
+        
+        if category == "Home" then
+            -- Welcome text
+            local welcomeText = Instance.new("TextLabel")
+            welcomeText.Name = "WelcomeText"
+            welcomeText.Size = UDim2.new(1, -40, 0, 60)
+            welcomeText.Position = UDim2.new(0, 20, 0, 20)
+            welcomeText.BackgroundTransparency = 1
+            welcomeText.Text = "Welcome to PowerPlay GUI!"
+            welcomeText.TextColor3 = Color3.fromRGB(240, 240, 240)
+            welcomeText.Font = Enum.Font.SourceSansBold
+            welcomeText.TextSize = 24
+            welcomeText.TextXAlignment = Enum.TextXAlignment.Left
+            welcomeText.Parent = page
+            
+            -- Stats frame
+            local statsFrame = Instance.new("Frame")
+            statsFrame.Name = "StatsFrame"
+            statsFrame.Size = UDim2.new(1, -40, 0, 100)
+            statsFrame.Position = UDim2.new(0, 20, 0, 80)
+            statsFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+            statsFrame.BorderSizePixel = 0
+            
+            local statsCorner = Instance.new("UICorner")
+            statsCorner.CornerRadius = UDim.new(0, 6)
+            statsCorner.Parent = statsFrame
+            
+            local statsTitle = Instance.new("TextLabel")
+            statsTitle.Size = UDim2.new(1, 0, 0, 30)
+            statsTitle.BackgroundTransparency = 1
+            statsTitle.Text = "Statistics"
+            statsTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
+            statsTitle.Font = Enum.Font.SourceSansSemibold
+            statsTitle.TextSize = 18
+            statsTitle.Parent = statsFrame
+            
+            local activeFeatures = Instance.new("TextLabel")
+            activeFeatures.Name = "ActiveFeatures"
+            activeFeatures.Size = UDim2.new(1, -20, 0, 20)
+            activeFeatures.Position = UDim2.new(0, 10, 0, 40)
+            activeFeatures.BackgroundTransparency = 1
+            activeFeatures.Text = "Active Features: 0/" .. #features
+            activeFeatures.TextColor3 = Color3.fromRGB(240, 240, 240)
+            activeFeatures.Font = Enum.Font.SourceSans
+            activeFeatures.TextSize = 16
+            activeFeatures.TextXAlignment = Enum.TextXAlignment.Left
+            activeFeatures.Parent = statsFrame
+            
+            local playTime = Instance.new("TextLabel")
+            playTime.Size = UDim2.new(1, -20, 0, 20)
+            playTime.Position = UDim2.new(0, 10, 0, 70)
+            playTime.BackgroundTransparency = 1
+            playTime.Text = "Session Time: 00:00:00"
+            playTime.TextColor3 = Color3.fromRGB(240, 240, 240)
+            playTime.Font = Enum.Font.SourceSans
+            playTime.TextSize = 16
+            playTime.TextXAlignment = Enum.TextXAlignment.Left
+            playTime.Parent = statsFrame
+            
+            statsFrame.Parent = page
+            
+            -- Quick access frame
+            local quickAccessFrame = Instance.new("Frame")
+            quickAccessFrame.Name = "QuickAccessFrame"
+            quickAccessFrame.Size = UDim2.new(1, -40, 0, 100)
+            quickAccessFrame.Position = UDim2.new(0, 20, 0, 200)
+            quickAccessFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+            quickAccessFrame.BorderSizePixel = 0
+            
+            local quickAccessCorner = Instance.new("UICorner")
+            quickAccessCorner.CornerRadius = UDim.new(0, 6)
+            quickAccessCorner.Parent = quickAccessFrame
+            
+            local quickAccessTitle = Instance.new("TextLabel")
+            quickAccessTitle.Size = UDim2.new(1, 0, 0, 30)
+            quickAccessTitle.BackgroundTransparency = 1
+            quickAccessTitle.Text = "Quick Access"
+            quickAccessTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
+            quickAccessTitle.Font = Enum.Font.SourceSansSemibold
+            quickAccessTitle.TextSize = 18
+            quickAccessTitle.Parent = quickAccessFrame
+            
+            -- Create quick access buttons for popular features
+            local popularFeatures = {"Speed Boost", "Wall Hack", "ESP"}
+            for i, featureName in ipairs(popularFeatures) do
+                local quickButton = Instance.new("TextButton")
+                quickButton.Name = featureName .. "QuickButton"
+                quickButton.Size = UDim2.new(0, 100, 0, 30)
+                quickButton.Position = UDim2.new(0, 10 + (i-1) * 120, 0, 40)
+                quickButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+                quickButton.Text = featureName
+                quickButton.TextColor3 = Color3.fromRGB(240, 240, 240)
+                quickButton.Font = Enum.Font.SourceSans
+                quickButton.TextSize = 14
+                quickButton.BorderSizePixel = 0
+                
+                local quickButtonCorner = Instance.new("UICorner")
+                quickButtonCorner.CornerRadius = UDim.new(0, 4)
+                quickButtonCorner.Parent = quickButton
+                
+                quickButton.Parent = quickAccessFrame
+            end
+            
+            quickAccessFrame.Parent = page
+        else
+            -- Content container for other pages
+            local content = Instance.new("ScrollingFrame")
+            content.Name = "Content"
+            content.Size = UDim2.new(1, -20, 1, -20)
+            content.Position = UDim2.new(0, 10, 0, 10)
+            content.BackgroundTransparency = 1
+            content.ScrollBarThickness = 6
+            content.ScrollingDirection = Enum.ScrollingDirection.Y
+            content.CanvasSize = UDim2.new(0, 0, 0, 400) -- Will be adjusted based on content
+            
+            -- Create feature buttons specific to this category
+            local yPos = 10
+            for _, feature in ipairs(features) do
+                if feature.category == category then
+                    local featureButton = Instance.new("TextButton")
+                    featureButton.Name = feature.name .. "Button"
+                    featureButton.Size = UDim2.new(1, -20, 0, 60)
+                    featureButton.Position = UDim2.new(0, 10, 0, yPos)
+                    featureButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+                    featureButton.Text = ""
+                    featureButton.BorderSizePixel = 0
+                    
+                    local featureCorner = Instance.new("UICorner")
+                    featureCorner.CornerRadius = UDim.new(0, 6)
+                    featureCorner.Parent = featureButton
+                    
+                    local featureName = Instance.new("TextLabel")
+                    featureName.Size = UDim2.new(1, -20, 0, 25)
+                    featureName.Position = UDim2.new(0, 60, 0, 5)
+                    featureName.BackgroundTransparency = 1
+                    featureName.Text = feature.name
+                    featureName.TextColor3 = Color3.fromRGB(240, 240, 240)
+                    featureName.Font = Enum.Font.SourceSansBold
+                    featureName.TextSize = 18
+                    featureName.TextXAlignment = Enum.TextXAlignment.Left
+                    featureName.Parent = featureButton
+                    
+                    local featureDesc = Instance.new("TextLabel")
+                    featureDesc.Name = "Tooltip"
+                    featureDesc.Size = UDim2.new(1, -20, 0, 20)
+                    featureDesc.Position = UDim2.new(0, 60, 0, 30)
+                    featureDesc.BackgroundTransparency = 1
+                    featureDesc.Text = feature.description
+                    featureDesc.TextColor3 = Color3.fromRGB(200, 200, 200)
+                    featureDesc.Font = Enum.Font.SourceSans
+                    featureDesc.TextSize = 14
+                    featureDesc.TextXAlignment = Enum.TextXAlignment.Left
+                    featureDesc.Parent = featureButton
+                    
+                    local featureIcon = Instance.new("ImageLabel")
+                    featureIcon.Size = UDim2.new(0, 40, 0, 40)
+                    featureIcon.Position = UDim2.new(0, 10, 0, 10)
+                    featureIcon.BackgroundTransparency = 1
+                    featureIcon.Image = "rbxassetid://6072557440" -- Placeholder icon
+                    featureIcon.Parent = featureButton
+                    
+                    local keybind = Instance.new("TextLabel")
+                    keybind.Name = "Keybind"
+                    keybind.Size = UDim2.new(0, 40, 0, 20)
+                    keybind.Position = UDim2.new(1, -50, 0, 20)
+                    keybind.BackgroundTransparency = 1
+                    keybind.Text = "[" .. feature.keyBind .. "]"
+                    keybind.TextColor3 = Color3.fromRGB(200, 200, 200)
+                    keybind.Font = Enum.Font.SourceSans
+                    keybind.TextSize = 14
+                    keybind.TextXAlignment = Enum.TextXAlignment.Right
+                    keybind.Parent = featureButton
+                    
+                    featureButton.Parent = content
+                    yPos = yPos + 70
+                end
+            end
+            
+            -- If this is the utility page, add teleport locations list
+            if category == "Utility" then
+                -- Add a gap
+                yPos = yPos + 20
+                
+                -- Teleport locations title
+                local locationsTitle = Instance.new("TextLabel")
+                locationsTitle.Size = UDim2.new(1, -20, 0, 30)
+                locationsTitle.Position = UDim2.new(0, 10, 0, yPos)
+                locationsTitle.BackgroundTransparency = 1
+                locationsTitle.Text = "Teleport Locations"
+                locationsTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
+                locationsTitle.Font = Enum.Font.SourceSansSemibold
+                locationsTitle.TextSize = 18
+                locationsTitle.TextXAlignment = Enum.TextXAlignment.Left
+                locationsTitle.Parent = content
+                
+                yPos = yPos + 40
+                
+                -- Teleport locations list
+                local locationsList = Instance.new("Frame")
+                locationsList.Name = "TeleportLocationsList"
+                locationsList.Size = UDim2.new(1, -20, 0, 100)
+                locationsList.Position = UDim2.new(0, 10, 0, yPos)
+                locationsList.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+                locationsList.BorderSizePixel = 0
+                
+                local locationsCorner = Instance.new("UICorner")
+                locationsCorner.CornerRadius = UDim.new(0, 6)
+                locationsCorner.Parent = locationsList
+                
+                -- Placeholder for locations (will be populated when teleport is activated)
+                local placeholderText = Instance.new("TextLabel")
+                placeholderText.Size = UDim2.new(1, 0, 1, 0)
+                placeholderText.BackgroundTransparency = 1
+                placeholderText.Text = "Activate Teleport to detect locations"
+                placeholderText.TextColor3 = Color3.fromRGB(200, 200, 200)
+                placeholderText.Font = Enum.Font.SourceSans
+                placeholderText.TextSize = 16
+                placeholderText.Parent = locationsList
+                
+                locationsList.Parent = content
+                
+                yPos = yPos + 120
+                
+                -- Save current location button
+                local saveLocationButton = Instance.new("TextButton")
+                saveLocationButton.Name = "SaveLocationButton"
+                saveLocationButton.Size = UDim2.new(0, 150, 0, 30)
+                saveLocationButton.Position = UDim2.new(0, 10, 0, yPos)
+                saveLocationButton.BackgroundColor3 = Color3.fromRGB(60, 120, 60)
+                saveLocationButton.Text = "Save Current Location"
+                saveLocationButton.TextColor3 = Color3.fromRGB(240, 240, 240)
+                saveLocationButton.Font = Enum.Font.SourceSans
+                saveLocationButton.TextSize = 14
+                saveLocationButton.BorderSizePixel = 0
+                
+                local saveLocationCorner = Instance.new("UICorner")
+                saveLocationCorner.CornerRadius = UDim.new(0, 4)
+                saveLocationCorner.Parent = saveLocationButton
+                
+                saveLocationButton.Parent = content
+                
+                -- Text box for custom location name
+                local locationNameBox = Instance.new("TextBox")
+                locationNameBox.Name = "LocationNameBox"
+                locationNameBox.Size = UDim2.new(0, 150, 0, 30)
+                locationNameBox.Position = UDim2.new(0, 170, 0, yPos)
+                locationNameBox.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+                locationNameBox.Text = ""
+                locationNameBox.PlaceholderText = "Location Name"
+                locationNameBox.TextColor3 = Color3.fromRGB(240, 240, 240)
+                locationNameBox.Font = Enum.Font.SourceSans
+                locationNameBox.TextSize = 14
+                locationNameBox.BorderSizePixel = 0
+                
+                local locationNameCorner = Instance.new("UICorner")
+                locationNameCorner.CornerRadius = UDim.new(0, 4)
+                locationNameCorner.Parent = locationNameBox
+                
+                locationNameBox.Parent = content
+            end
+            
+            -- Adjust canvas size
+            content.CanvasSize = UDim2.new(0, 0, 0, yPos + 30)
+            content.Parent = page
+        end
+        
+        page.Parent = contentFrame
+    end
+    
+    contentFrame.Parent = mainFrame
+    
+    -- Create status bar
+    local statusBar = Instance.new("Frame")
+    statusBar.Name = "StatusBar"
+    statusBar.Size = UDim2.new(1, 0, 0, 30)
+    statusBar.Position = UDim2.new(0, 0, 1, -30)
+    statusBar.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+    statusBar.BorderSizePixel = 0
+    
+    local statusText = Instance.new("TextLabel")
+    statusText.Name = "StatusText"
+    statusText.Size = UDim2.new(1, -20, 1, 0)
+    statusText.Position = UDim2.new(0, 10, 0, 0)
+    statusText.BackgroundTransparency = 1
+    statusText.Text = "Ready"
+    statusText.TextColor3 = Color3.fromRGB(200, 200, 200)
+    statusText.Font = Enum.Font.SourceSans
+    statusText.TextSize = 14
+    statusText.TextXAlignment = Enum.TextXAlignment.Left
+    statusText.Parent = statusBar
+    
+    statusBar.Parent = mainFrame
+    
+    -- Parent to PlayerGui
+    mainFrame.Parent = screenGui
+    screenGui.Parent = playerGui
+    
+    -- Set created flag
+    guiCreated = true
+    
+    return screenGui, mainFrame
+end
+
+-- Set up interactions for the GUI
+function setupGuiInteractions()
+    if not mainFrame then return end
+    
+    -- Set up navigation buttons
+    for _, category in ipairs(categories) do
+        local button = mainFrame:FindFirstChild("Navigation"):FindFirstChild(category.."Button")
+        if button then
+            button.MouseButton1Click:Connect(function()
+                switchPage(category)
+            end)
+        end
+    end
+    
+    -- Set up title bar functionality
+    local titleBar = mainFrame:FindFirstChild("TitleBar")
+    local isDragging = false
+    local dragStartPosition = nil
+    local dragStartOffset = nil
+    
+    titleBar.MouseButton1Down:Connect(function(x, y)
+        isDragging = true
+        dragStartPosition = Vector2.new(x, y)
+        dragStartOffset = mainFrame.Position
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            isDragging = false
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = Vector2.new(input.Position.X, input.Position.Y) - dragStartPosition
+            local newPosition = UDim2.new(
+                dragStartOffset.X.Scale,
+                dragStartOffset.X.Offset + delta.X,
+                dragStartOffset.Y.Scale,
+                dragStartOffset.Y.Offset + delta.Y
+            )
+            mainFrame.Position = newPosition
+        end
+    end)
+    
+    -- Set up close and minimize buttons
+    local closeButton = titleBar:FindFirstChild("CloseButton")
+    closeButton.MouseButton1Click:Connect(function()
+        toggleGui()
+    end)
+    
+    local minimizeButton = titleBar:FindFirstChild("MinimizeButton")
+    minimizeButton.MouseButton1Click:Connect(function()
+        UIEffects.minimizeFrame(mainFrame)
+    end)
+    
+    -- Set up feature buttons
+    for _, feature in ipairs(features) do
+        for _, categoryName in ipairs(categories) do
+            local categoryPage = mainFrame:FindFirstChild("Content"):FindFirstChild(categoryName.."Page")
+            if categoryPage then
+                local content = categoryPage:FindFirstChild("Content")
+                if content then
+                    local featureButton = content:FindFirstChild(feature.name.."Button")
+                    if featureButton then
+                        featureButton.MouseButton1Click:Connect(function()
+                            toggleFeature(feature.name)
+                        end)
+                    end
+                end
+            end
+        end
+        
+        -- Also connect quick access buttons on home page
+        local homePage = mainFrame:FindFirstChild("Content"):FindFirstChild("HomePage")
+        if homePage then
+            local quickAccessFrame = homePage:FindFirstChild("QuickAccessFrame")
+            if quickAccessFrame then
+                local quickButton = quickAccessFrame:FindFirstChild(feature.name.."QuickButton")
+                if quickButton then
+                    quickButton.MouseButton1Click:Connect(function()
+                        toggleFeature(feature.name)
+                    end)
+                end
+            end
+        end
+    end
+    
+    -- Set up teleport-specific UI
+    local utilityPage = mainFrame:FindFirstChild("Content"):FindFirstChild("UtilityPage")
+    if utilityPage then
+        local content = utilityPage:FindFirstChild("Content")
+        if content then
+            local saveLocationButton = content:FindFirstChild("SaveLocationButton")
+            local locationNameBox = content:FindFirstChild("LocationNameBox")
+            
+            if saveLocationButton and locationNameBox then
+                saveLocationButton.MouseButton1Click:Connect(function()
+                    local locationName = locationNameBox.Text
+                    if locationName == "" then
+                        setStatus("Please enter a location name")
+                        return
+                    end
+                    
+                    local success, result = pcall(function()
+                        return Teleport.saveCurrentLocation(player, locationName)
+                    end)
+                    
+                    if success and result then
+                        locationNameBox.Text = ""
+                        setStatus("Location saved: " .. locationName)
+                        updateTeleportLocationsList()
+                    else
+                        setStatus("Failed to save location: " .. (result or "unknown error"))
+                    end
+                end)
+            end
+        end
+    end
+    
+    -- Set up keyboard shortcut (Right Shift to toggle GUI)
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed then
+            if input.KeyCode == Enum.KeyCode.RightShift then
+                toggleGui()
+            else
+                -- Check for feature keybinds
+                for _, feature in ipairs(features) do
+                    if input.KeyCode == Enum.KeyCode[feature.keyBind] then
+                        toggleFeature(feature.name)
+                    end
+                end
+            end
+        end
+    end)
+}
+
+-- Update teleport locations list in the UI
+function updateTeleportLocationsList()
+    local utilityPage = mainFrame:FindFirstChild("Content"):FindFirstChild("UtilityPage")
+    if not utilityPage then return end
+    
+    local content = utilityPage:FindFirstChild("Content")
+    if not content then return end
+    
+    local locationsList = content:FindFirstChild("TeleportLocationsList")
+    if not locationsList then return end
+    
+    -- Clear existing list
+    for _, child in ipairs(locationsList:GetChildren()) do
+        if child:IsA("TextButton") or (child:IsA("TextLabel") and child.Name ~= "Title") then
+            child:Destroy()
+        end
+    end
+    
+    -- Get locations from Teleport module
+    local success, locations = pcall(function()
+        return Teleport.getLocations()
+    end)
+    
+    if not success or #locations == 0 then
+        -- Show placeholder text if no locations
+        local placeholderText = locationsList:FindFirstChild("PlaceholderText")
+        if not placeholderText then
+            placeholderText = Instance.new("TextLabel")
+            placeholderText.Name = "PlaceholderText"
+            placeholderText.Size = UDim2.new(1, 0, 1, 0)
+            placeholderText.BackgroundTransparency = 1
+            placeholderText.Text = "No locations found"
+            placeholderText.TextColor3 = Color3.fromRGB(200, 200, 200)
+            placeholderText.Font = Enum.Font.SourceSans
+            placeholderText.TextSize = 16
+            placeholderText.Parent = locationsList
+        end
+        return
+    end
+    
+    -- Remove placeholder
+    local placeholder = locationsList:FindFirstChild("PlaceholderText")
+    if placeholder then
+        placeholder:Destroy()
+    end
+    
+    -- Add location buttons
+    for i, location in ipairs(locations) do
+        local locationButton = Instance.new("TextButton")
+        locationButton.Name = location.name .. "Button"
+        locationButton.Size = UDim2.new(1, -20, 0, 30)
+        locationButton.Position = UDim2.new(0, 10, 0, 10 + (i-1) * 35)
+        locationButton.BackgroundColor3 = location.isCustom 
+            and Color3.fromRGB(60, 80, 120) 
+            or Color3.fromRGB(60, 60, 80)
+        locationButton.Text = location.name
+        locationButton.TextColor3 = Color3.fromRGB(240, 240, 240)
+        locationButton.Font = Enum.Font.SourceSans
+        locationButton.TextSize = 14
+        locationButton.BorderSizePixel = 0
+        
+        local locationCorner = Instance.new("UICorner")
+        locationCorner.CornerRadius = UDim.new(0, 4)
+        locationCorner.Parent = locationButton
+        
+        locationButton.MouseButton1Click:Connect(function()
+            local success, result = pcall(function()
+                return Teleport.teleportToLocation(player, location.name)
+            end)
+            
+            if success then
+                setStatus("Teleporting to " .. location.name)
+            else
+                setStatus("Failed to teleport: " .. (result or "unknown error"))
+            end
+        end)
+        
+        locationButton.Parent = locationsList
+    end
+    
+    -- Adjust list size
+    locationsList.Size = UDim2.new(1, -20, 0, math.min(200, 10 + #locations * 35 + 10))
+end
+
+-- Run update loop for active features
+function updateLoop()
+    -- Track session time
+    local sessionStartTime = tick()
+    
+    RunService.RenderStepped:Connect(function(deltaTime)
+        if not guiCreated then return end
+        
+        -- Update session time on home page
+        local homePage = mainFrame:FindFirstChild("Content"):FindFirstChild("HomePage")
+        if homePage and homePage.Visible then
+            local statsFrame = homePage:FindFirstChild("StatsFrame")
+            if statsFrame then
+                local playTime = statsFrame:FindFirstChild("Session Time")
+                if playTime then
+                    local sessionTime = tick() - sessionStartTime
+                    local hours = math.floor(sessionTime / 3600)
+                    local minutes = math.floor((sessionTime % 3600) / 60)
+                    local seconds = math.floor(sessionTime % 60)
+                    playTime.Text = string.format("Session Time: %02d:%02d:%02d", hours, minutes, seconds)
+                end
+            end
+        end
+        
+        -- Update active features
+        for featureName, isActive in pairs(activeFeatures) do
+            if isActive then
+                for _, feature in ipairs(features) do
+                    if feature.name == featureName then
+                        pcall(function()
+                            feature.module.update(deltaTime, player)
+                        end)
+                        break
+                    end
+                end
+            end
+        end
+    end)
+end
+
+------------------------------
+-- Main Execution
+------------------------------
+-- Initialize the GUI
+createGui()
+setupGuiInteractions()
+updateLoop()
+
+-- Display welcome message and instructions
+switchPage("Home")
+setStatus("Welcome to PowerPlay GUI! Press RightShift to toggle.")
+
+-- Initially hide the GUI
+mainFrame.Visible = false
