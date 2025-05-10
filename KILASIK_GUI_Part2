@@ -1,0 +1,1053 @@
+-- Open Aimbot settings menu
+function openAimbotSettings()
+    -- Create settings frame
+    local settingsFrame = Instance.new("Frame")
+    settingsFrame.Name = "AimbotSettingsFrame"
+    settingsFrame.Size = UDim2.new(0, 300, 0, 350)
+    settingsFrame.Position = UDim2.new(0.5, -150, 0.5, -175)
+    settingsFrame.BackgroundColor3 = colors.background
+    settingsFrame.BorderSizePixel = 0
+    settingsFrame.Active = true
+    settingsFrame.Draggable = true
+    
+    local cornerRadius = Instance.new("UICorner")
+    cornerRadius.CornerRadius = UDim.new(0, 10)
+    cornerRadius.Parent = settingsFrame
+    
+    -- Title
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0, 30)
+    titleLabel.BackgroundColor3 = colors.header
+    titleLabel.BorderSizePixel = 0
+    titleLabel.Text = "Aimbot Settings"
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 16
+    titleLabel.TextColor3 = colors.text
+    titleLabel.Parent = settingsFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 10)
+    titleCorner.Parent = titleLabel
+    
+    local titleCover = Instance.new("Frame")
+    titleCover.Size = UDim2.new(1, 0, 0, 10)
+    titleCover.Position = UDim2.new(0, 0, 1, -10)
+    titleCover.BackgroundColor3 = colors.header
+    titleCover.BorderSizePixel = 0
+    titleCover.ZIndex = 0
+    titleCover.Parent = titleLabel
+    
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 24, 0, 24)
+    closeBtn.Position = UDim2.new(1, -27, 0, 3)
+    closeBtn.BackgroundColor3 = colors.warning
+    closeBtn.Text = "X"
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 14
+    closeBtn.TextColor3 = colors.text
+    closeBtn.Parent = titleLabel
+    
+    local closeBtnCorner = Instance.new("UICorner")
+    closeBtnCorner.CornerRadius = UDim.new(0, 4)
+    closeBtnCorner.Parent = closeBtn
+    
+    -- Settings container
+    local settingsContainer = Instance.new("ScrollingFrame")
+    settingsContainer.Size = UDim2.new(1, -20, 1, -40)
+    settingsContainer.Position = UDim2.new(0, 10, 0, 35)
+    settingsContainer.BackgroundTransparency = 1
+    settingsContainer.BorderSizePixel = 0
+    settingsContainer.ScrollBarThickness = 4
+    settingsContainer.ScrollingDirection = Enum.ScrollingDirection.Y
+    settingsContainer.CanvasSize = UDim2.new(0, 0, 0, 400)
+    settingsContainer.Parent = settingsFrame
+    
+    -- Settings layout
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 10)
+    layout.Parent = settingsContainer
+    
+    -- Add settings
+    local yPos = 0
+    
+    -- 1. Team Check toggle
+    addToggleSetting(settingsContainer, "Team Check", aimbotSettings.teamCheck, function(value)
+        aimbotSettings.teamCheck = value
+        setStatus("Aimbot Team Check: " .. (value and "Enabled" or "Disabled"))
+        saveSettings()
+    end)
+    
+    -- 2. Visibility Check toggle
+    addToggleSetting(settingsContainer, "Visibility Check", aimbotSettings.visibilityCheck, function(value)
+        aimbotSettings.visibilityCheck = value
+        setStatus("Aimbot Visibility Check: " .. (value and "Enabled" or "Disabled"))
+        saveSettings()
+    end)
+    
+    -- 3. Show FOV Circle toggle
+    addToggleSetting(settingsContainer, "Show FOV Circle", aimbotSettings.showFOV, function(value)
+        aimbotSettings.showFOV = value
+        setStatus("Aimbot FOV Circle: " .. (value and "Shown" or "Hidden"))
+        
+        if not value and getgenv().FOVCircle then
+            getgenv().FOVCircle:Remove()
+            getgenv().FOVCircle = nil
+        elseif value and aimbotSettings.enabled then
+            setAimbotFOV(aimbotSettings.fovSize)
+        end
+        
+        saveSettings()
+    end)
+    
+    -- 4. Wallbang toggle
+    addToggleSetting(settingsContainer, "Wallbang", aimbotSettings.wallbangEnabled, function(value)
+        aimbotSettings.wallbangEnabled = value
+        setStatus("Wallbang: " .. (value and "Enabled" or "Disabled"))
+        saveSettings()
+    end)
+    
+    -- 5. FOV Size slider
+    addSliderSetting(settingsContainer, "FOV Size", aimbotSettings.fovSize, 10, 500, function(value)
+        aimbotSettings.fovSize = value
+        setStatus("Aimbot FOV Size: " .. value)
+        
+        if aimbotSettings.showFOV and aimbotSettings.enabled then
+            setAimbotFOV(value)
+        end
+        
+        saveSettings()
+    end)
+    
+    -- 6. Sensitivity slider
+    addSliderSetting(settingsContainer, "Sensitivity", aimbotSettings.sensitivity * 100, 1, 100, function(value)
+        aimbotSettings.sensitivity = value / 100
+        setStatus("Aimbot Sensitivity: " .. value .. "%")
+        saveSettings()
+    end)
+    
+    -- 7. Target part dropdown
+    local targetParts = {"Head", "Torso", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
+    addDropdownSetting(settingsContainer, "Target Part", aimbotSettings.aimPart, targetParts, function(value)
+        aimbotSettings.aimPart = value
+        setStatus("Aimbot Target Part: " .. value)
+        saveSettings()
+    end)
+    
+    -- 8. Toggle Key selector
+    addKeyBindSetting(settingsContainer, "Toggle Key", aimbotSettings.toggleKey, function(key)
+        aimbotSettings.toggleKey = key
+        setStatus("Aimbot Toggle Key set to: " .. key)
+        saveSettings()
+    end)
+    
+    -- Close button functionality
+    closeBtn.MouseButton1Click:Connect(function()
+        settingsFrame:Destroy()
+    end)
+    
+    -- Parent to GUI
+    local gui = findMainGUI()
+    if gui then
+        settingsFrame.Parent = gui
+    else
+        settingsFrame.Parent = player.PlayerGui
+    end
+    
+    -- Auto-size the container
+    settingsContainer.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+    
+    return settingsFrame
+end
+
+-- Add a toggle setting to a container
+function addToggleSetting(container, name, initialValue, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.BackgroundColor3 = colors.neutralDark
+    frame.BorderSizePixel = 0
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -60, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextColor3 = colors.text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    
+    local toggle = Instance.new("Frame")
+    toggle.Size = UDim2.new(0, 40, 0, 20)
+    toggle.Position = UDim2.new(1, -50, 0.5, -10)
+    toggle.BackgroundColor3 = initialValue and colors.success or colors.neutralLight
+    toggle.BorderSizePixel = 0
+    toggle.Parent = frame
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(1, 0)
+    toggleCorner.Parent = toggle
+    
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 16, 0, 16)
+    knob.Position = UDim2.new(initialValue and 1 or 0, initialValue and -18 or 2, 0.5, -8)
+    knob.BackgroundColor3 = colors.text
+    knob.BorderSizePixel = 0
+    knob.Parent = toggle
+    
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(1, 0)
+    knobCorner.Parent = knob
+    
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, 0, 1, 0)
+    button.BackgroundTransparency = 1
+    button.Text = ""
+    button.Parent = frame
+    
+    local toggleValue = initialValue
+    
+    button.MouseButton1Click:Connect(function()
+        toggleValue = not toggleValue
+        toggle.BackgroundColor3 = toggleValue and colors.success or colors.neutralLight
+        
+        -- Animate knob
+        local newPos = toggleValue and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+        local tween = TweenService:Create(knob, TweenInfo.new(0.2), {Position = newPos})
+        tween:Play()
+        
+        callback(toggleValue)
+    end)
+    
+    frame.Parent = container
+    return frame
+end
+
+-- Add a slider setting to a container
+function addSliderSetting(container, name, initialValue, minValue, maxValue, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 60)
+    frame.BackgroundColor3 = colors.neutralDark
+    frame.BorderSizePixel = 0
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -10, 0, 20)
+    label.Position = UDim2.new(0, 10, 0, 5)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextColor3 = colors.text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    
+    local valueLabel = Instance.new("TextLabel")
+    valueLabel.Size = UDim2.new(0, 40, 0, 20)
+    valueLabel.Position = UDim2.new(1, -50, 0, 5)
+    valueLabel.BackgroundTransparency = 1
+    valueLabel.Text = tostring(initialValue)
+    valueLabel.Font = Enum.Font.Gotham
+    valueLabel.TextSize = 14
+    valueLabel.TextColor3 = colors.text
+    valueLabel.Parent = frame
+    
+    local sliderBg = Instance.new("Frame")
+    sliderBg.Size = UDim2.new(1, -20, 0, 6)
+    sliderBg.Position = UDim2.new(0, 10, 0, 35)
+    sliderBg.BackgroundColor3 = colors.neutralLight
+    sliderBg.BorderSizePixel = 0
+    sliderBg.Parent = frame
+    
+    local sliderBgCorner = Instance.new("UICorner")
+    sliderBgCorner.CornerRadius = UDim.new(1, 0)
+    sliderBgCorner.Parent = sliderBg
+    
+    local sliderFill = Instance.new("Frame")
+    sliderFill.Size = UDim2.new((initialValue - minValue) / (maxValue - minValue), 0, 1, 0)
+    sliderFill.BackgroundColor3 = colors.highlight
+    sliderFill.BorderSizePixel = 0
+    sliderFill.Parent = sliderBg
+    
+    local sliderFillCorner = Instance.new("UICorner")
+    sliderFillCorner.CornerRadius = UDim.new(1, 0)
+    sliderFillCorner.Parent = sliderFill
+    
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 16, 0, 16)
+    knob.Position = UDim2.new((initialValue - minValue) / (maxValue - minValue), -8, 0.5, -8)
+    knob.BackgroundColor3 = colors.text
+    knob.BorderSizePixel = 0
+    knob.Parent = sliderBg
+    
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(1, 0)
+    knobCorner.Parent = knob
+    
+    -- Slider interaction
+    local isDragging = false
+    
+    knob.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            isDragging = true
+        end
+    end)
+    
+    knob.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            isDragging = false
+        end
+    end)
+    
+    sliderBg.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            isDragging = true
+            updateSlider(input.Position.X)
+        end
+    end)
+    
+    sliderBg.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            isDragging = false
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            updateSlider(input.Position.X)
+        end
+    end)
+    
+    function updateSlider(mouseX)
+        local sliderPosition = math.clamp((mouseX - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+        local value = math.floor(minValue + sliderPosition * (maxValue - minValue))
+        
+        -- Update visuals
+        sliderFill.Size = UDim2.new(sliderPosition, 0, 1, 0)
+        knob.Position = UDim2.new(sliderPosition, -8, 0.5, -8)
+        valueLabel.Text = tostring(value)
+        
+        -- Call callback
+        callback(value)
+    end
+    
+    frame.Parent = container
+    return frame
+end
+
+-- Add a dropdown setting to a container
+function addDropdownSetting(container, name, initialValue, options, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.BackgroundColor3 = colors.neutralDark
+    frame.BorderSizePixel = 0
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.5, -10, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextColor3 = colors.text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    
+    local dropdown = Instance.new("Frame")
+    dropdown.Size = UDim2.new(0.5, -10, 0, 30)
+    dropdown.Position = UDim2.new(0.5, 0, 0.5, -15)
+    dropdown.BackgroundColor3 = colors.button
+    dropdown.BorderSizePixel = 0
+    dropdown.ClipsDescendants = true
+    dropdown.ZIndex = 10
+    dropdown.Parent = frame
+    
+    local dropdownCorner = Instance.new("UICorner")
+    dropdownCorner.CornerRadius = UDim.new(0, 6)
+    dropdownCorner.Parent = dropdown
+    
+    local selectedLabel = Instance.new("TextLabel")
+    selectedLabel.Size = UDim2.new(1, -30, 1, 0)
+    selectedLabel.BackgroundTransparency = 1
+    selectedLabel.Text = initialValue
+    selectedLabel.Font = Enum.Font.Gotham
+    selectedLabel.TextSize = 14
+    selectedLabel.TextColor3 = colors.text
+    selectedLabel.ZIndex = 11
+    selectedLabel.Parent = dropdown
+    
+    local arrow = Instance.new("TextLabel")
+    arrow.Size = UDim2.new(0, 20, 1, 0)
+    arrow.Position = UDim2.new(1, -25, 0, 0)
+    arrow.BackgroundTransparency = 1
+    arrow.Text = "▼"
+    arrow.Font = Enum.Font.Gotham
+    arrow.TextSize = 14
+    arrow.TextColor3 = colors.text
+    arrow.ZIndex = 11
+    arrow.Parent = dropdown
+    
+    local dropButton = Instance.new("TextButton")
+    dropButton.Size = UDim2.new(1, 0, 1, 0)
+    dropButton.BackgroundTransparency = 1
+    dropButton.Text = ""
+    dropButton.ZIndex = 12
+    dropButton.Parent = dropdown
+    
+    -- Dropdown options container
+    local optionsFrame = Instance.new("Frame")
+    optionsFrame.Name = "Options"
+    optionsFrame.Size = UDim2.new(1, 0, 0, #options * 30)
+    optionsFrame.Position = UDim2.new(0, 0, 1, 0)
+    optionsFrame.BackgroundColor3 = colors.neutralDark
+    optionsFrame.BorderSizePixel = 0
+    optionsFrame.Visible = false
+    optionsFrame.ZIndex = 15
+    optionsFrame.Parent = dropdown
+    
+    local optionsCorner = Instance.new("UICorner")
+    optionsCorner.CornerRadius = UDim.new(0, 6)
+    optionsCorner.Parent = optionsFrame
+    
+    -- Add options
+    for i, option in ipairs(options) do
+        local optionButton = Instance.new("TextButton")
+        optionButton.Size = UDim2.new(1, 0, 0, 30)
+        optionButton.Position = UDim2.new(0, 0, 0, (i-1) * 30)
+        optionButton.BackgroundColor3 = colors.button
+        optionButton.BackgroundTransparency = 0.3
+        optionButton.Text = option
+        optionButton.Font = Enum.Font.Gotham
+        optionButton.TextSize = 14
+        optionButton.TextColor3 = colors.text
+        optionButton.ZIndex = 16
+        optionButton.Parent = optionsFrame
+        
+        optionButton.MouseButton1Click:Connect(function()
+            selectedLabel.Text = option
+            optionsFrame.Visible = false
+            callback(option)
+        end)
+        
+        -- Hover effect
+        optionButton.MouseEnter:Connect(function()
+            optionButton.BackgroundColor3 = colors.buttonHover
+        end)
+        
+        optionButton.MouseLeave:Connect(function()
+            optionButton.BackgroundColor3 = colors.button
+        end)
+    end
+    
+    -- Toggle dropdown
+    local dropdownOpen = false
+    
+    dropButton.MouseButton1Click:Connect(function()
+        dropdownOpen = not dropdownOpen
+        optionsFrame.Visible = dropdownOpen
+        arrow.Text = dropdownOpen and "▲" or "▼"
+    end)
+    
+    -- Close dropdown when clicking elsewhere
+    UserInputService.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local mousePos = input.Position
+            local dropdownPos = dropdown.AbsolutePosition
+            local dropdownSize = dropdown.AbsoluteSize
+            
+            if mousePos.X < dropdownPos.X or mousePos.X > dropdownPos.X + dropdownSize.X or
+               mousePos.Y < dropdownPos.Y or mousePos.Y > dropdownPos.Y + dropdownSize.Y + (dropdownOpen and optionsFrame.AbsoluteSize.Y or 0) then
+                dropdownOpen = false
+                optionsFrame.Visible = false
+                arrow.Text = "▼"
+            end
+        end
+    end)
+    
+    frame.Parent = container
+    return frame
+end
+
+-- Add a key bind setting to a container
+function addKeyBindSetting(container, name, initialKey, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.BackgroundColor3 = colors.neutralDark
+    frame.BorderSizePixel = 0
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.5, -10, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextColor3 = colors.text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    
+    local keyButton = Instance.new("TextButton")
+    keyButton.Size = UDim2.new(0.5, -10, 0, 30)
+    keyButton.Position = UDim2.new(0.5, 0, 0.5, -15)
+    keyButton.BackgroundColor3 = colors.button
+    keyButton.Text = initialKey
+    keyButton.Font = Enum.Font.Gotham
+    keyButton.TextSize = 14
+    keyButton.TextColor3 = colors.text
+    keyButton.BorderSizePixel = 0
+    keyButton.Parent = frame
+    
+    local keyCorner = Instance.new("UICorner")
+    keyCorner.CornerRadius = UDim.new(0, 6)
+    keyCorner.Parent = keyButton
+    
+    -- Key binding functionality
+    local awaitingInput = false
+    
+    keyButton.MouseButton1Click:Connect(function()
+        if awaitingInput then return end
+        
+        awaitingInput = true
+        keyButton.Text = "Press any key..."
+        
+        -- Disconnect previous connection if it exists
+        if getgenv().KeyBindConnection then
+            getgenv().KeyBindConnection:Disconnect()
+            getgenv().KeyBindConnection = nil
+        end
+        
+        getgenv().KeyBindConnection = UserInputService.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                local keyName = input.KeyCode.Name
+                keyButton.Text = keyName
+                awaitingInput = false
+                
+                -- Remove the connection
+                getgenv().KeyBindConnection:Disconnect()
+                getgenv().KeyBindConnection = nil
+                
+                callback(keyName)
+            elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+                keyButton.Text = "MouseButton1"
+                awaitingInput = false
+                
+                getgenv().KeyBindConnection:Disconnect()
+                getgenv().KeyBindConnection = nil
+                
+                callback("MouseButton1")
+            elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                keyButton.Text = "MouseButton2"
+                awaitingInput = false
+                
+                getgenv().KeyBindConnection:Disconnect()
+                getgenv().KeyBindConnection = nil
+                
+                callback("MouseButton2")
+            end
+        end)
+    end)
+    
+    frame.Parent = container
+    return frame
+end
+
+-- Open ESP settings menu
+function openESPSettings()
+    -- Create settings frame
+    local settingsFrame = Instance.new("Frame")
+    settingsFrame.Name = "ESPSettingsFrame"
+    settingsFrame.Size = UDim2.new(0, 300, 0, 350)
+    settingsFrame.Position = UDim2.new(0.5, -150, 0.5, -175)
+    settingsFrame.BackgroundColor3 = colors.background
+    settingsFrame.BorderSizePixel = 0
+    settingsFrame.Active = true
+    settingsFrame.Draggable = true
+    
+    local cornerRadius = Instance.new("UICorner")
+    cornerRadius.CornerRadius = UDim.new(0, 10)
+    cornerRadius.Parent = settingsFrame
+    
+    -- Title
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0, 30)
+    titleLabel.BackgroundColor3 = colors.header
+    titleLabel.BorderSizePixel = 0
+    titleLabel.Text = "ESP Settings"
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 16
+    titleLabel.TextColor3 = colors.text
+    titleLabel.Parent = settingsFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 10)
+    titleCorner.Parent = titleLabel
+    
+    local titleCover = Instance.new("Frame")
+    titleCover.Size = UDim2.new(1, 0, 0, 10)
+    titleCover.Position = UDim2.new(0, 0, 1, -10)
+    titleCover.BackgroundColor3 = colors.header
+    titleCover.BorderSizePixel = 0
+    titleCover.ZIndex = 0
+    titleCover.Parent = titleLabel
+    
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 24, 0, 24)
+    closeBtn.Position = UDim2.new(1, -27, 0, 3)
+    closeBtn.BackgroundColor3 = colors.warning
+    closeBtn.Text = "X"
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 14
+    closeBtn.TextColor3 = colors.text
+    closeBtn.Parent = titleLabel
+    
+    local closeBtnCorner = Instance.new("UICorner")
+    closeBtnCorner.CornerRadius = UDim.new(0, 4)
+    closeBtnCorner.Parent = closeBtn
+    
+    -- Settings container
+    local settingsContainer = Instance.new("ScrollingFrame")
+    settingsContainer.Size = UDim2.new(1, -20, 1, -40)
+    settingsContainer.Position = UDim2.new(0, 10, 0, 35)
+    settingsContainer.BackgroundTransparency = 1
+    settingsContainer.BorderSizePixel = 0
+    settingsContainer.ScrollBarThickness = 4
+    settingsContainer.ScrollingDirection = Enum.ScrollingDirection.Y
+    settingsContainer.CanvasSize = UDim2.new(0, 0, 0, 400)
+    settingsContainer.Parent = settingsFrame
+    
+    -- Settings layout
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 10)
+    layout.Parent = settingsContainer
+    
+    -- Add settings
+    local yPos = 0
+    
+    -- 1. ESP Boxes toggle
+    addToggleSetting(settingsContainer, "Show Boxes", espSettings.boxes, function(value)
+        espSettings.boxes = value
+        setStatus("ESP Boxes: " .. (value and "Enabled" or "Disabled"))
+        toggleESPOption("boxes")
+    end)
+    
+    -- 2. ESP Names toggle
+    addToggleSetting(settingsContainer, "Show Names", espSettings.names, function(value)
+        espSettings.names = value
+        setStatus("ESP Names: " .. (value and "Enabled" or "Disabled"))
+        toggleESPOption("names")
+    end)
+    
+    -- 3. ESP Tracers toggle
+    addToggleSetting(settingsContainer, "Show Tracers", espSettings.tracers, function(value)
+        espSettings.tracers = value
+        setStatus("ESP Tracers: " .. (value and "Enabled" or "Disabled"))
+        toggleESPOption("tracers")
+    end)
+    
+    -- 4. ESP Health Bars toggle
+    addToggleSetting(settingsContainer, "Show Health Bars", espSettings.showHealthBar, function(value)
+        espSettings.showHealthBar = value
+        setStatus("ESP Health Bars: " .. (value and "Enabled" or "Disabled"))
+        toggleESPOption("showHealthBar")
+    end)
+    
+    -- 5. ESP Team Check toggle
+    addToggleSetting(settingsContainer, "Team Check", espSettings.teamCheck, function(value)
+        espSettings.teamCheck = value
+        setStatus("ESP Team Check: " .. (value and "Enabled" or "Disabled"))
+        toggleESPOption("teamCheck")
+    end)
+    
+    -- 6. ESP Team Color toggle
+    addToggleSetting(settingsContainer, "Use Team Colors", espSettings.teamColor, function(value)
+        espSettings.teamColor = value
+        setStatus("ESP Team Colors: " .. (value and "Enabled" or "Disabled"))
+        toggleESPOption("teamColor")
+    end)
+    
+    -- 7. ESP Chams toggle
+    addToggleSetting(settingsContainer, "Show Chams", espSettings.chams, function(value)
+        espSettings.chams = value
+        setStatus("ESP Chams: " .. (value and "Enabled" or "Disabled"))
+        toggleESPOption("chams")
+    end)
+    
+    -- 8. ESP Max Distance slider
+    addSliderSetting(settingsContainer, "Max Distance", espSettings.maxDistance, 100, 2000, function(value)
+        espSettings.maxDistance = value
+        setStatus("ESP Max Distance: " .. value)
+        saveSettings()
+    end)
+    
+    -- 9. ESP Toggle Key
+    addKeyBindSetting(settingsContainer, "Toggle Key", keyBindSettings.ESP.key, function(key)
+        keyBindSettings.ESP.key = key
+        setStatus("ESP Toggle Key set to: " .. key)
+        saveSettings()
+    end)
+    
+    -- Close button functionality
+    closeBtn.MouseButton1Click:Connect(function()
+        settingsFrame:Destroy()
+    end)
+    
+    -- Parent to GUI
+    local gui = findMainGUI()
+    if gui then
+        settingsFrame.Parent = gui
+    else
+        settingsFrame.Parent = player.PlayerGui
+    end
+    
+    -- Auto-size the container
+    settingsContainer.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+    
+    return settingsFrame
+end
+
+-- Open key binds settings menu
+function openKeyBindSettings()
+    -- Create settings frame
+    local settingsFrame = Instance.new("Frame")
+    settingsFrame.Name = "KeyBindSettingsFrame"
+    settingsFrame.Size = UDim2.new(0, 350, 0, 400)
+    settingsFrame.Position = UDim2.new(0.5, -175, 0.5, -200)
+    settingsFrame.BackgroundColor3 = colors.background
+    settingsFrame.BorderSizePixel = 0
+    settingsFrame.Active = true
+    settingsFrame.Draggable = true
+    
+    local cornerRadius = Instance.new("UICorner")
+    cornerRadius.CornerRadius = UDim.new(0, 10)
+    cornerRadius.Parent = settingsFrame
+    
+    -- Title
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0, 30)
+    titleLabel.BackgroundColor3 = colors.header
+    titleLabel.BorderSizePixel = 0
+    titleLabel.Text = "Keyboard Shortcuts"
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 16
+    titleLabel.TextColor3 = colors.text
+    titleLabel.Parent = settingsFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 10)
+    titleCorner.Parent = titleLabel
+    
+    local titleCover = Instance.new("Frame")
+    titleCover.Size = UDim2.new(1, 0, 0, 10)
+    titleCover.Position = UDim2.new(0, 0, 1, -10)
+    titleCover.BackgroundColor3 = colors.header
+    titleCover.BorderSizePixel = 0
+    titleCover.ZIndex = 0
+    titleCover.Parent = titleLabel
+    
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 24, 0, 24)
+    closeBtn.Position = UDim2.new(1, -27, 0, 3)
+    closeBtn.BackgroundColor3 = colors.warning
+    closeBtn.Text = "X"
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 14
+    closeBtn.TextColor3 = colors.text
+    closeBtn.Parent = titleLabel
+    
+    local closeBtnCorner = Instance.new("UICorner")
+    closeBtnCorner.CornerRadius = UDim.new(0, 4)
+    closeBtnCorner.Parent = closeBtn
+    
+    -- Settings container
+    local settingsContainer = Instance.new("ScrollingFrame")
+    settingsContainer.Size = UDim2.new(1, -20, 1, -40)
+    settingsContainer.Position = UDim2.new(0, 10, 0, 35)
+    settingsContainer.BackgroundTransparency = 1
+    settingsContainer.BorderSizePixel = 0
+    settingsContainer.ScrollBarThickness = 4
+    settingsContainer.ScrollingDirection = Enum.ScrollingDirection.Y
+    settingsContainer.CanvasSize = UDim2.new(0, 0, 0, 500)
+    settingsContainer.Parent = settingsFrame
+    
+    -- Settings layout
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 10)
+    layout.Parent = settingsContainer
+    
+    -- Add keybind settings
+    
+    -- Fly keybind
+    addKeyBindWithToggle(settingsContainer, "Fly", keyBindSettings.Fly.key, keyBindSettings.Fly.enabled, function(key, enabled)
+        keyBindSettings.Fly.key = key
+        keyBindSettings.Fly.enabled = enabled
+        
+        -- Apply changes if needed
+        if enabled ~= flying then
+            toggleFly()
+        end
+        
+        setStatus("Fly keybind set to: " .. key)
+        saveSettings()
+    end)
+    
+    -- Noclip keybind
+    addKeyBindWithToggle(settingsContainer, "Noclip", keyBindSettings.Noclip.key, keyBindSettings.Noclip.enabled, function(key, enabled)
+        keyBindSettings.Noclip.key = key
+        keyBindSettings.Noclip.enabled = enabled
+        
+        -- Apply changes if needed
+        if enabled ~= noclip then
+            toggleNoclip()
+        end
+        
+        setStatus("Noclip keybind set to: " .. key)
+        saveSettings()
+    end)
+    
+    -- Speed keybind
+    addKeyBindWithToggle(settingsContainer, "Speed Boost", keyBindSettings.Speed.key, keyBindSettings.Speed.enabled, function(key, enabled)
+        keyBindSettings.Speed.key = key
+        keyBindSettings.Speed.enabled = enabled
+        
+        -- Apply changes if needed
+        if enabled then
+            setWalkSpeed(50) -- Speed boost
+        else
+            setWalkSpeed(16) -- Normal speed
+        end
+        
+        setStatus("Speed keybind set to: " .. key)
+        saveSettings()
+    end)
+    
+    -- ESP keybind
+    addKeyBindWithToggle(settingsContainer, "ESP", keyBindSettings.ESP.key, keyBindSettings.ESP.enabled, function(key, enabled)
+        keyBindSettings.ESP.key = key
+        keyBindSettings.ESP.enabled = enabled
+        
+        -- Apply changes if needed
+        if enabled ~= espSettings.enabled then
+            toggleESP()
+        end
+        
+        setStatus("ESP keybind set to: " .. key)
+        saveSettings()
+    end)
+    
+    -- Aimbot keybind
+    addKeyBindWithToggle(settingsContainer, "Aimbot", keyBindSettings.Aimbot.key, keyBindSettings.Aimbot.enabled, function(key, enabled)
+        keyBindSettings.Aimbot.key = key
+        keyBindSettings.Aimbot.enabled = enabled
+        
+        -- Apply changes if needed
+        if enabled ~= aimbotSettings.enabled then
+            toggleAimbot()
+        end
+        
+        setStatus("Aimbot keybind set to: " .. key)
+        saveSettings()
+    end)
+    
+    -- ClickTP keybind
+    addKeyBindWithToggle(settingsContainer, "Click Teleport", keyBindSettings.ClickTP.key, keyBindSettings.ClickTP.enabled, function(key, enabled)
+        keyBindSettings.ClickTP.key = key
+        keyBindSettings.ClickTP.enabled = enabled
+        
+        -- Apply changes if needed
+        if enabled ~= getgenv().ClickTPEnabled then
+            toggleClickTP()
+        end
+        
+        setStatus("Click Teleport keybind set to: " .. key)
+        saveSettings()
+    end)
+    
+    -- Reset keybind
+    addKeyBindWithToggle(settingsContainer, "Reset Character", keyBindSettings.Reset.key, keyBindSettings.Reset.enabled, function(key, enabled)
+        keyBindSettings.Reset.key = key
+        keyBindSettings.Reset.enabled = enabled
+        setStatus("Reset Character keybind set to: " .. key)
+        saveSettings()
+    end)
+    
+    -- InfiniteJump keybind
+    addKeyBindWithToggle(settingsContainer, "Infinite Jump", keyBindSettings.InfiniteJump.key, keyBindSettings.InfiniteJump.enabled, function(key, enabled)
+        keyBindSettings.InfiniteJump.key = key
+        keyBindSettings.InfiniteJump.enabled = enabled
+        
+        -- Apply changes if needed
+        if enabled ~= infiniteJump then
+            toggleInfiniteJump()
+        end
+        
+        setStatus("Infinite Jump keybind set to: " .. key)
+        saveSettings()
+    end)
+    
+    -- Close button functionality
+    closeBtn.MouseButton1Click:Connect(function()
+        settingsFrame:Destroy()
+    end)
+    
+    -- Parent to GUI
+    local gui = findMainGUI()
+    if gui then
+        settingsFrame.Parent = gui
+    else
+        settingsFrame.Parent = player.PlayerGui
+    end
+    
+    -- Auto-size the container
+    settingsContainer.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+    
+    return settingsFrame
+end
+
+-- Add a keybind with toggle to a container
+function addKeyBindWithToggle(container, name, initialKey, initialEnabled, callback)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.BackgroundColor3 = colors.neutralDark
+    frame.BorderSizePixel = 0
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = frame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.4, -10, 1, 0)
+    label.Position = UDim2.new(0, 10, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.Font = Enum.Font.Gotham
+    label.TextSize = 14
+    label.TextColor3 = colors.text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+    
+    -- Key button
+    local keyButton = Instance.new("TextButton")
+    keyButton.Size = UDim2.new(0.35, -10, 0, 30)
+    keyButton.Position = UDim2.new(0.4, 0, 0.5, -15)
+    keyButton.BackgroundColor3 = colors.button
+    keyButton.Text = initialKey
+    keyButton.Font = Enum.Font.Gotham
+    keyButton.TextSize = 14
+    keyButton.TextColor3 = colors.text
+    keyButton.BorderSizePixel = 0
+    keyButton.Parent = frame
+    
+    local keyCorner = Instance.new("UICorner")
+    keyCorner.CornerRadius = UDim.new(0, 6)
+    keyCorner.Parent = keyButton
+    
+    -- Toggle
+    local toggle = Instance.new("Frame")
+    toggle.Size = UDim2.new(0, 40, 0, 20)
+    toggle.Position = UDim2.new(1, -50, 0.5, -10)
+    toggle.BackgroundColor3 = initialEnabled and colors.success or colors.neutralLight
+    toggle.BorderSizePixel = 0
+    toggle.Parent = frame
+    
+    local toggleCorner = Instance.new("UICorner")
+    toggleCorner.CornerRadius = UDim.new(1, 0)
+    toggleCorner.Parent = toggle
+    
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 16, 0, 16)
+    knob.Position = UDim2.new(initialEnabled and 1 or 0, initialEnabled and -18 or 2, 0.5, -8)
+    knob.BackgroundColor3 = colors.text
+    knob.BorderSizePixel = 0
+    knob.Parent = toggle
+    
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(1, 0)
+    knobCorner.Parent = knob
+    
+    local toggleButton = Instance.new("TextButton")
+    toggleButton.Size = UDim2.new(1, 0, 1, 0)
+    toggleButton.BackgroundTransparency = 1
+    toggleButton.Text = ""
+    toggleButton.Parent = toggle
+    
+    -- Key binding functionality
+    local awaitingInput = false
+    local toggleValue = initialEnabled
+    
+    keyButton.MouseButton1Click:Connect(function()
+        if awaitingInput then return end
+        
+        awaitingInput = true
+        keyButton.Text = "Press any key..."
+        
+        -- Disconnect previous connection if it exists
+        if getgenv().KeyBindConnection then
+            getgenv().KeyBindConnection:Disconnect()
+            getgenv().KeyBindConnection = nil
+        end
+        
+        getgenv().KeyBindConnection = UserInputService.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Keyboard then
+                local keyName = input.KeyCode.Name
+                keyButton.Text = keyName
+                awaitingInput = false
+                
+                -- Remove the connection
+                getgenv().KeyBindConnection:Disconnect()
+                getgenv().KeyBindConnection = nil
+                
+                callback(keyName, toggleValue)
+            elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+                keyButton.Text = "MouseButton1"
+                awaitingInput = false
+                
+                getgenv().KeyBindConnection:Disconnect()
+                getgenv().KeyBindConnection = nil
+                
+                callback("MouseButton1", toggleValue)
+            elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                keyButton.Text = "MouseButton2"
+                awaitingInput = false
+                
+                getgenv().KeyBindConnection:Disconnect()
+                getgenv().KeyBindConnection = nil
+                
+                callback("MouseButton2", toggleValue)
+            end
+        end)
+    end)
+    
+    -- Toggle functionality
+    toggleButton.MouseButton1Click:Connect(function()
+        toggleValue = not toggleValue
+        toggle.BackgroundColor3 = toggleValue and colors.success or colors.neutralLight
+        
+        -- Animate knob
+        local newPos = toggleValue and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+        local tween = TweenService:Create(knob, TweenInfo.new(0.2), {Position = newPos})
+        tween:Play()
+        
+        callback(keyButton.Text, toggleValue)
+    end)
+    
+    frame.Parent = container
+    return frame
+end
