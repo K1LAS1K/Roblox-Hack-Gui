@@ -1,0 +1,934 @@
+--[[
+  KILASIK GUI - Advanced Game Control Interface
+  This script creates a feature-rich GUI with many commands and features
+  
+  Usage: Paste the code into your executor and run it
+  
+  Key System: Requires a valid key to use. Get the key from our Discord server.
+  
+  Credit: KILASIK
+]]
+
+-- Services
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local Teams = game:GetService("Teams")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+local TeleportService = game:GetService("TeleportService")
+local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local VirtualUser = game:GetService("VirtualUser")
+local NetworkClient = game:GetService("NetworkClient")
+local GuiService = game:GetService("GuiService")
+
+-- Key System
+local KEY_CODE = "KILASIK2025" -- Key code
+local DISCORD_LINK = "https://discord.gg/PHxN8nadgk" -- Discord server link
+local keyVerified = false
+
+-- Basic variables
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+local camera = Workspace.CurrentCamera
+local guiCreated = false
+local guiVisible = false
+local minimized = false
+local miniSize = false
+local activeTab = "Main"
+local favoriteCommands = {}
+local resizingGui = false
+local originalGuiSize = UDim2.new(0, 550, 0, 350)
+local minGuiSize = UDim2.new(0, 400, 0, 250)
+
+-- Key Binds Storage
+local keyBindSettings = {
+    -- Default keybinds
+    Fly = {key = "F", enabled = false},
+    Noclip = {key = "N", enabled = false},
+    Speed = {key = "LeftShift", enabled = false},
+    ESP = {key = "E", enabled = false},
+    Aimbot = {key = "B", enabled = false},
+    ClickTP = {key = "LeftControl", enabled = false},
+    Reset = {key = "R", enabled = false},
+    InfiniteJump = {key = "Space", enabled = false}
+}
+
+-- Speed and character control
+local walkSpeed = 16
+local jumpPower = 50
+local infiniteJump = false
+local noclip = false
+local flying = false
+local flySpeed = 2
+local xray = false
+local espSettings = {
+    enabled = false,
+    boxes = true,
+    names = true,
+    distances = true,
+    teamCheck = true,
+    teamColor = true,
+    tracers = false,
+    chams = false,
+    showHealthBar = true,
+    maxDistance = 1000
+}
+
+local aimbotSettings = {
+    enabled = false,
+    teamCheck = true,
+    visibilityCheck = true,
+    aimPart = "Head",
+    sensitivity = 0.5,
+    fovSize = 100,
+    showFOV = true,
+    toggleKey = "B",
+    wallbangEnabled = false
+}
+
+local aimbotTarget = nil
+local selectedPlayers = {}
+local selectedParts = {}
+
+-- GUI Colors
+local colors = {
+    background = Color3.fromRGB(25, 25, 30),
+    header = Color3.fromRGB(35, 35, 40),
+    button = Color3.fromRGB(45, 45, 55),
+    buttonHover = Color3.fromRGB(55, 55, 65),
+    buttonSelected = Color3.fromRGB(65, 105, 225),
+    text = Color3.fromRGB(240, 240, 240),
+    highlight = Color3.fromRGB(65, 105, 225),
+    warning = Color3.fromRGB(200, 60, 60),
+    success = Color3.fromRGB(60, 180, 75),
+    neutralLight = Color3.fromRGB(70, 70, 85),
+    neutralDark = Color3.fromRGB(40, 40, 50),
+    shadow = Color3.fromRGB(15, 15, 20),
+    categoryBG = Color3.fromRGB(30, 30, 35),
+    favorite = Color3.fromRGB(255, 215, 0)
+}
+
+-- All Commands
+local commands = {
+    -- Main commands
+    {name = "Speed", desc = "Set character walk speed", category = "Character", func = function(speed) setWalkSpeed(tonumber(speed) or 16) end, canFavorite = true},
+    {name = "JumpPower", desc = "Set character jump power", category = "Character", func = function(power) setJumpPower(tonumber(power) or 50) end, canFavorite = true},
+    {name = "InfiniteJump", desc = "Jump infinitely", category = "Character", func = function() toggleInfiniteJump() end, canFavorite = true},
+    {name = "Fly", desc = "Toggle fly mode", category = "Character", func = function() toggleFly() end, canFavorite = true},
+    {name = "Noclip", desc = "Walk through walls", category = "Character", func = function() toggleNoclip() end, canFavorite = true},
+    {name = "XRay", desc = "Make walls transparent", category = "Vision", func = function() toggleXRay() end, canFavorite = true},
+    {name = "ESP", desc = "Highlight players and objects", category = "ESP", func = function() toggleESP() end, canFavorite = true},
+    {name = "ESP Boxes", desc = "Toggle ESP boxes", category = "ESP", func = function() toggleESPOption("boxes") end, canFavorite = true},
+    {name = "ESP Names", desc = "Toggle ESP names", category = "ESP", func = function() toggleESPOption("names") end, canFavorite = true},
+    {name = "ESP Tracers", desc = "Toggle ESP tracers", category = "ESP", func = function() toggleESPOption("tracers") end, canFavorite = true},
+    {name = "ESP TeamCheck", desc = "Toggle ESP team check", category = "ESP", func = function() toggleESPOption("teamCheck") end, canFavorite = true},
+    {name = "ESP TeamColor", desc = "Toggle ESP team color", category = "ESP", func = function() toggleESPOption("teamColor") end, canFavorite = true},
+    {name = "ESP Chams", desc = "Toggle ESP chams", category = "ESP", func = function() toggleESPOption("chams") end, canFavorite = true},
+    {name = "ESP HealthBar", desc = "Toggle ESP health bars", category = "ESP", func = function() toggleESPOption("showHealthBar") end, canFavorite = true},
+    {name = "Aimbot", desc = "Auto aim at players", category = "Combat", func = function() toggleAimbot() end, canFavorite = true},
+    {name = "Teleport", desc = "Teleport to mouse position", category = "Teleport", func = function() teleportToMouse() end, canFavorite = true},
+    {name = "ClickTP", desc = "Click to teleport (Ctrl+Click)", category = "Teleport", func = function() toggleClickTP() end, canFavorite = true},
+    {name = "TpToPlayer", desc = "Teleport to a specific player", category = "Teleport", func = function() openPlayerSelectionMenu("tp") end, canFavorite = true},
+    {name = "GetPosition", desc = "Copy current position", category = "Teleport", func = function() copyPosition() end, canFavorite = true},
+    {name = "Reset", desc = "Reset character", category = "Character", func = function() resetCharacter() end, canFavorite = true},
+    {name = "Rejoin", desc = "Rejoin the same server", category = "Utility", func = function() rejoinServer() end, canFavorite = true},
+    {name = "NoFog", desc = "Remove fog", category = "Vision", func = function() removeFog() end, canFavorite = true},
+    {name = "FullBright", desc = "Full brightness", category = "Vision", func = function() enableFullBright() end, canFavorite = true},
+    {name = "Invisible", desc = "Make character invisible", category = "Character", func = function() makeInvisible() end, canFavorite = true},
+    {name = "RemoveMesh", desc = "Remove meshes", category = "Character", func = function() removeMeshes() end, canFavorite = true},
+    
+    -- Combat commands
+    {name = "Aimbot Settings", desc = "Configure aimbot options", category = "Combat", func = function() openAimbotSettings() end, canFavorite = true},
+    {name = "Aimbot FOV", desc = "Set aimbot field of view", category = "Combat", func = function(size) setAimbotFOV(tonumber(size) or 100) end, canFavorite = true},
+    {name = "Wallbang", desc = "Shoot through walls", category = "Combat", func = function() toggleWallbang() end, canFavorite = true},
+    {name = "KillAura", desc = "Auto hit nearby players", category = "Combat", func = function() toggleKillAura() end, canFavorite = true},
+    {name = "InfiniteAmmo", desc = "Unlimited ammo", category = "Combat", func = function() giveInfiniteAmmo() end, canFavorite = true},
+    {name = "GodMode", desc = "Try god mode", category = "Combat", func = function() attemptGodMode() end, canFavorite = true},
+    {name = "AutoFarm", desc = "Auto collect resources", category = "Utility", func = function() toggleAutoFarm() end, canFavorite = true},
+    {name = "Reach", desc = "Increase weapon reach", category = "Combat", func = function() increaseReach() end, canFavorite = true},
+    
+    -- Animation commands
+    {name = "Zombie", desc = "Play zombie animation", category = "Animations", func = function() playAnimation("zombie") end, canFavorite = true},
+    {name = "Ninja", desc = "Play ninja animation", category = "Animations", func = function() playAnimation("ninja") end, canFavorite = true},
+    {name = "Robot", desc = "Play robot animation", category = "Animations", func = function() playAnimation("robot") end, canFavorite = true},
+    {name = "Dab", desc = "Play dab animation", category = "Animations", func = function() playAnimation("dab") end, canFavorite = true},
+    {name = "Floss", desc = "Play floss dance", category = "Animations", func = function() playAnimation("floss") end, canFavorite = true},
+    {name = "Groove", desc = "Play groove dance", category = "Animations", func = function() playAnimation("groove") end, canFavorite = true},
+    {name = "Lay", desc = "Play lay animation", category = "Animations", func = function() playAnimation("lay") end, canFavorite = true},
+    {name = "Sit", desc = "Play sit animation", category = "Animations", func = function() playAnimation("sit") end, canFavorite = true},
+    {name = "Superhero", desc = "Play superhero animation", category = "Animations", func = function() playAnimation("superhero") end, canFavorite = true},
+    {name = "Spin", desc = "Play spin animation", category = "Animations", func = function() playAnimation("spin") end, canFavorite = true},
+    {name = "Punch", desc = "Play punch animation", category = "Animations", func = function() playAnimation("punch") end, canFavorite = true},
+    {name = "Dino", desc = "Play dinosaur animation", category = "Animations", func = function() playAnimation("dino") end, canFavorite = true},
+    
+    -- Troll/Fun commands
+    {name = "DanceAnimate", desc = "Play dance animation", category = "Fun", func = function() playDanceAnimation() end, canFavorite = true},
+    {name = "FakeChat", desc = "Send fake chat message", category = "Fun", func = function() openFakeChatPrompt() end, canFavorite = true},
+    {name = "GiantSize", desc = "Make character giant", category = "Fun", func = function() makeGiantSize() end, canFavorite = true},
+    {name = "TinySize", desc = "Make character tiny", category = "Fun", func = function() makeTinySize() end, canFavorite = true},
+    {name = "FloatingParts", desc = "Create floating parts", category = "Fun", func = function() createFloatingParts() end, canFavorite = true},
+    {name = "SpinCharacter", desc = "Spin your character", category = "Fun", func = function() spinCharacter() end, canFavorite = true},
+    {name = "Ultimate Fling", desc = "Advanced fling script", category = "Fun", func = function() loadUltimateFling() end, canFavorite = true},
+    {name = "Touch Fling", desc = "Fling players on touch", category = "Fun", func = function() loadTouchFling() end, canFavorite = true},
+    
+    -- Player commands
+    {name = "Spectate", desc = "Spectate a player", category = "Players", func = function() openPlayerSelectionMenu("spectate") end, canFavorite = true},
+    {name = "Unspectate", desc = "Stop spectating", category = "Players", func = function() unspectatePlayer() end, canFavorite = true},
+    {name = "Goto", desc = "Go to a player", category = "Players", func = function() openPlayerSelectionMenu("goto") end, canFavorite = true},
+    {name = "Bring", desc = "Bring a player to you", category = "Players", func = function() openPlayerSelectionMenu("bring") end, canFavorite = true},
+    {name = "FlingPlayer", desc = "Fling a player", category = "Players", func = function() openPlayerSelectionMenu("fling") end, canFavorite = true},
+    
+    -- Tools
+    {name = "CopyPosition", desc = "Copy position to clipboard", category = "Utility", func = function() copyPosition() end, canFavorite = true},
+    {name = "BTools", desc = "Give building tools", category = "Utility", func = function() giveBTools() end, canFavorite = true},
+    {name = "ForceField", desc = "Apply force field", category = "Utility", func = function() applyForceField() end, canFavorite = true},
+    {name = "HighJump", desc = "Jump very high", category = "Character", func = function() doHighJump() end, canFavorite = true},
+    {name = "SwimMode", desc = "Swim in the air", category = "Character", func = function() toggleSwimMode() end, canFavorite = true},
+    
+    -- Visual commands
+    {name = "Rainbow", desc = "Rainbow character", category = "Visuals", func = function() makeRainbowCharacter() end, canFavorite = true},
+    {name = "ClearMap", desc = "Clear the map", category = "Visuals", func = function() clearMap() end, canFavorite = true},
+    {name = "LowGraphics", desc = "Low graphics settings", category = "Visuals", func = function() setLowGraphics() end, canFavorite = true},
+    {name = "RemoveTextures", desc = "Remove textures", category = "Visuals", func = function() removeTextures() end, canFavorite = true},
+    {name = "ShowHitboxes", desc = "Show hitboxes", category = "Visuals", func = function() showHitboxes() end, canFavorite = true},
+    
+    -- Special commands
+    {name = "InfiniteYield", desc = "Load Infinite Yield admin", category = "Utility", func = function() loadInfiniteYield() end, canFavorite = true},
+    {name = "AntiAFK", desc = "Prevent AFK kick", category = "Utility", func = function() enableAntiAFK() end, canFavorite = true},
+    {name = "FixCamera", desc = "Fix camera issues", category = "Utility", func = function() fixCamera() end, canFavorite = true},
+    
+    -- Settings commands 
+    {name = "Set Keybinds", desc = "Configure keyboard shortcuts", category = "Settings", func = function() openKeyBindSettings() end, canFavorite = true},
+    {name = "ESP Settings", desc = "Configure ESP options", category = "Settings", func = function() openESPSettings() end, canFavorite = true},
+    {name = "Aimbot Config", desc = "Detailed aimbot configuration", category = "Settings", func = function() openAimbotSettings() end, canFavorite = true},
+    {name = "GUI Color", desc = "Change GUI color theme", category = "Settings", func = function() openColorSettings() end, canFavorite = true},
+    {name = "GUI Scale", desc = "Adjust GUI size", category = "Settings", func = function() openGuiScaleSettings() end, canFavorite = true},
+    {name = "Reset Settings", desc = "Reset all settings to defaults", category = "Settings", func = function() resetAllSettings() end, canFavorite = true}
+}
+
+-- Categories
+local categories = {
+    "Favorites",
+    "Main",
+    "Character",
+    "Combat",
+    "ESP",
+    "Teleport",
+    "Players",
+    "Animations",
+    "Vision",
+    "Utility",
+    "Fun",
+    "Visuals",
+    "Settings"
+}
+
+-- =====================
+-- Function Definitions
+-- =====================
+
+-- Reset character (works when game blocks normal reset)
+function resetCharacter()
+    if not player.Character then
+        setStatus("No character to reset")
+        return
+    end
+    
+    -- Method 1: Break joints
+    pcall(function()
+        player.Character:BreakJoints()
+    end)
+    
+    -- Method A: Set health to 0
+    pcall(function()
+        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid.Health = 0
+        end
+    end)
+    
+    -- Method B: Remove humanoid
+    pcall(function()
+        local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid:Destroy()
+        end
+    end)
+    
+    -- Method C: Load character
+    pcall(function()
+        player:LoadCharacter()
+    end)
+    
+    -- Method D: Remove vital parts
+    pcall(function()
+        local head = player.Character:FindFirstChild("Head")
+        if head then
+            head:Destroy()
+        end
+    end)
+    
+    setStatus("Character reset")
+end
+
+-- Set walk speed
+function setWalkSpeed(speed)
+    if not player.Character or not player.Character:FindFirstChild("Humanoid") then return end
+    player.Character.Humanoid.WalkSpeed = speed
+    walkSpeed = speed
+    setStatus("Walk speed set to " .. speed)
+end
+
+-- Set jump power
+function setJumpPower(power)
+    if not player.Character or not player.Character:FindFirstChild("Humanoid") then return end
+    player.Character.Humanoid.JumpPower = power
+    jumpPower = power
+    setStatus("Jump power set to " .. power)
+end
+
+-- Infinite jump
+function toggleInfiniteJump()
+    infiniteJump = not infiniteJump
+    
+    if infiniteJump then
+        setStatus("Infinite jump enabled")
+    else
+        setStatus("Infinite jump disabled")
+    end
+    
+    -- Update keybind settings
+    keyBindSettings.InfiniteJump.enabled = infiniteJump
+    saveSettings()
+end
+
+-- Noclip (walk through walls)
+function toggleNoclip()
+    noclip = not noclip
+    
+    if noclip then
+        if getgenv().NoclipLoop then
+            getgenv().NoclipLoop:Disconnect()
+        end
+        
+        getgenv().NoclipLoop = RunService.Stepped:Connect(function()
+            if not noclip then 
+                getgenv().NoclipLoop:Disconnect()
+                getgenv().NoclipLoop = nil
+                
+                if player.Character then
+                    for _, part in pairs(player.Character:GetDescendants()) do
+                        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                            part.CanCollide = true
+                        end
+                    end
+                end
+                return 
+            end
+            
+            if player.Character then
+                for _, part in pairs(player.Character:GetDescendants()) do
+                    if part:IsA("BasePart") and part.CanCollide then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+        setStatus("Noclip enabled")
+    else
+        if getgenv().NoclipLoop then
+            getgenv().NoclipLoop:Disconnect()
+            getgenv().NoclipLoop = nil
+        end
+        
+        if player.Character then
+            for _, part in pairs(player.Character:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                    part.CanCollide = true
+                end
+            end
+        end
+        setStatus("Noclip disabled")
+    end
+    
+    -- Update keybind settings
+    keyBindSettings.Noclip.enabled = noclip
+    saveSettings()
+end
+
+-- Fly mode
+function toggleFly()
+    flying = not flying
+    
+    if flying then
+        -- Start fly code
+        if getgenv().FlyPart then
+            getgenv().FlyPart:Destroy()
+        end
+        
+        local flyPart = Instance.new("BodyVelocity")
+        flyPart.Velocity = Vector3.new(0, 0, 0)
+        flyPart.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        flyPart.Name = "FlyPart"
+        getgenv().FlyPart = flyPart
+        
+        -- Character movement
+        local controls = {
+            f = false,
+            b = false,
+            l = false,
+            r = false,
+            q = false,
+            e = false
+        }
+        
+        if getgenv().FlyConnection1 then
+            getgenv().FlyConnection1:Disconnect()
+        end
+        
+        if getgenv().FlyConnection2 then
+            getgenv().FlyConnection2:Disconnect()
+        end
+        
+        -- Keyboard controls
+        getgenv().FlyConnection1 = UserInputService.InputBegan:Connect(function(input)
+            if input.KeyCode == Enum.KeyCode.W then controls.f = true end
+            if input.KeyCode == Enum.KeyCode.S then controls.b = true end
+            if input.KeyCode == Enum.KeyCode.A then controls.l = true end
+            if input.KeyCode == Enum.KeyCode.D then controls.r = true end
+            if input.KeyCode == Enum.KeyCode.Q then controls.q = true end
+            if input.KeyCode == Enum.KeyCode.E then controls.e = true end
+        end)
+        
+        getgenv().FlyConnection2 = UserInputService.InputEnded:Connect(function(input)
+            if input.KeyCode == Enum.KeyCode.W then controls.f = false end
+            if input.KeyCode == Enum.KeyCode.S then controls.b = false end
+            if input.KeyCode == Enum.KeyCode.A then controls.l = false end
+            if input.KeyCode == Enum.KeyCode.D then controls.r = false end
+            if input.KeyCode == Enum.KeyCode.Q then controls.q = false end
+            if input.KeyCode == Enum.KeyCode.E then controls.e = false end
+        end)
+        
+        if getgenv().FlyLoop then
+            getgenv().FlyLoop:Disconnect()
+        end
+        
+        local function fly()
+            if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+            
+            local rootPart = player.Character.HumanoidRootPart
+            local flyPartInstance = rootPart:FindFirstChild("FlyPart") or flyPart:Clone()
+            flyPartInstance.Parent = rootPart
+            
+            getgenv().FlyLoop = RunService.Heartbeat:Connect(function()
+                if not flying then 
+                    getgenv().FlyLoop:Disconnect()
+                    getgenv().FlyLoop = nil
+                    
+                    if flyPartInstance and flyPartInstance.Parent then
+                        flyPartInstance:Destroy()
+                    end
+                    
+                    if player.Character and player.Character:FindFirstChild("Humanoid") then
+                        player.Character.Humanoid.PlatformStand = false
+                    end
+                    return 
+                end
+                
+                player.Character.Humanoid.PlatformStand = true
+                
+                local direction = Vector3.new(0, 0, 0)
+                
+                -- Move based on camera direction
+                local lookVector = camera.CFrame.LookVector
+                local rightVector = camera.CFrame.RightVector
+                
+                if controls.f then
+                    direction = direction + lookVector
+                end
+                if controls.b then
+                    direction = direction - lookVector
+                end
+                if controls.r then
+                    direction = direction + rightVector
+                end
+                if controls.l then
+                    direction = direction - rightVector
+                end
+                if controls.q then
+                    direction = direction + Vector3.new(0, 1, 0)
+                end
+                if controls.e then
+                    direction = direction + Vector3.new(0, -1, 0)
+                end
+                
+                if direction.Magnitude > 0 then
+                    direction = direction.Unit
+                end
+                
+                flyPartInstance.Velocity = direction * flySpeed * 50
+            end)
+        end
+        
+        fly()
+        setStatus("Fly mode enabled - Use WASDQE to move")
+    else
+        -- Disable fly mode
+        if getgenv().FlyLoop then
+            getgenv().FlyLoop:Disconnect()
+            getgenv().FlyLoop = nil
+        end
+        
+        if getgenv().FlyConnection1 then
+            getgenv().FlyConnection1:Disconnect()
+            getgenv().FlyConnection1 = nil
+        end
+        
+        if getgenv().FlyConnection2 then
+            getgenv().FlyConnection2:Disconnect()
+            getgenv().FlyConnection2 = nil
+        end
+        
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local flyPartInstance = player.Character.HumanoidRootPart:FindFirstChild("FlyPart")
+            if flyPartInstance then
+                flyPartInstance:Destroy()
+            end
+        end
+        
+        if getgenv().FlyPart then
+            pcall(function()
+                getgenv().FlyPart:Destroy()
+            end)
+            getgenv().FlyPart = nil
+        end
+        
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.PlatformStand = false
+        end
+        
+        setStatus("Fly mode disabled")
+    end
+    
+    -- Update keybind settings
+    keyBindSettings.Fly.enabled = flying
+    saveSettings()
+end
+
+-- X-Ray (see through walls)
+function toggleXRay()
+    xray = not xray
+    
+    if xray then
+        -- Make walls transparent
+        for _, part in ipairs(Workspace:GetDescendants()) do
+            if part:IsA("BasePart") and not part:IsDescendantOf(player.Character) and part.Transparency < 0.8 and not part:IsA("Terrain") then
+                if not part:FindFirstChild("OriginalTransparency") then
+                    local originalValue = Instance.new("NumberValue")
+                    originalValue.Name = "OriginalTransparency"
+                    originalValue.Value = part.Transparency
+                    originalValue.Parent = part
+                end
+                part.Transparency = 0.8
+            end
+        end
+        setStatus("X-Ray enabled")
+    else
+        -- Restore wall transparency
+        for _, part in ipairs(Workspace:GetDescendants()) do
+            if part:IsA("BasePart") and part:FindFirstChild("OriginalTransparency") then
+                part.Transparency = part.OriginalTransparency.Value
+                part.OriginalTransparency:Destroy()
+            end
+        end
+        setStatus("X-Ray disabled")
+    end
+end
+
+-- Toggle specific ESP option
+function toggleESPOption(option)
+    if option == "boxes" then
+        espSettings.boxes = not espSettings.boxes
+        setStatus("ESP Boxes: " .. (espSettings.boxes and "Enabled" or "Disabled"))
+    elseif option == "names" then
+        espSettings.names = not espSettings.names
+        setStatus("ESP Names: " .. (espSettings.names and "Enabled" or "Disabled"))
+    elseif option == "tracers" then
+        espSettings.tracers = not espSettings.tracers
+        setStatus("ESP Tracers: " .. (espSettings.tracers and "Enabled" or "Disabled"))
+    elseif option == "teamCheck" then
+        espSettings.teamCheck = not espSettings.teamCheck
+        setStatus("ESP Team Check: " .. (espSettings.teamCheck and "Enabled" or "Disabled"))
+    elseif option == "teamColor" then
+        espSettings.teamColor = not espSettings.teamColor
+        setStatus("ESP Team Color: " .. (espSettings.teamColor and "Enabled" or "Disabled"))
+    elseif option == "chams" then
+        espSettings.chams = not espSettings.chams
+        setStatus("ESP Chams: " .. (espSettings.chams and "Enabled" or "Disabled"))
+    elseif option == "showHealthBar" then
+        espSettings.showHealthBar = not espSettings.showHealthBar
+        setStatus("ESP Health Bars: " .. (espSettings.showHealthBar and "Enabled" or "Disabled"))
+    end
+    
+    -- Apply changes if ESP is active
+    if espSettings.enabled then
+        updateESP()
+    end
+    
+    -- Save settings
+    saveSettings()
+end
+
+-- ESP (see players and objects)
+function toggleESP()
+    espSettings.enabled = not espSettings.enabled
+    
+    if espSettings.enabled then
+        -- Start ESP code
+        applyESP()
+        
+        -- Create update loop
+        if getgenv().ESPUpdateLoop then
+            getgenv().ESPUpdateLoop:Disconnect()
+        end
+        
+        getgenv().ESPUpdateLoop = RunService.RenderStepped:Connect(function()
+            if not espSettings.enabled then
+                getgenv().ESPUpdateLoop:Disconnect()
+                getgenv().ESPUpdateLoop = nil
+                
+                -- Clean up ESP elements
+                for _, plyr in ipairs(Players:GetPlayers()) do
+                    cleanupESP(plyr)
+                end
+                return
+            end
+            
+            updateESP()
+        end)
+        
+        setStatus("ESP enabled")
+    else
+        -- Disable ESP code, clean up elements
+        if getgenv().ESPUpdateLoop then
+            getgenv().ESPUpdateLoop:Disconnect()
+            getgenv().ESPUpdateLoop = nil
+        end
+        
+        for _, plyr in ipairs(Players:GetPlayers()) do
+            cleanupESP(plyr)
+        end
+        
+        setStatus("ESP disabled")
+    end
+    
+    -- Update keybind settings
+    keyBindSettings.ESP.enabled = espSettings.enabled
+    saveSettings()
+end
+
+-- Apply ESP to all players
+function applyESP()
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= player then
+            addESPToPlayer(otherPlayer)
+        end
+    end
+    
+    -- Connect to PlayerAdded event to ESP new players
+    Players.PlayerAdded:Connect(function(newPlayer)
+        if espSettings.enabled and newPlayer ~= player then
+            addESPToPlayer(newPlayer)
+        end
+    end)
+end
+
+-- Add ESP to a specific player
+function addESPToPlayer(targetPlayer)
+    if not targetPlayer.Character then
+        -- Wait for character to load
+        targetPlayer.CharacterAdded:Connect(function(char)
+            if espSettings.enabled then
+                createESPForCharacter(targetPlayer, char)
+            end
+        end)
+        return
+    end
+    
+    createESPForCharacter(targetPlayer, targetPlayer.Character)
+end
+
+-- Create ESP elements for a character
+function createESPForCharacter(targetPlayer, character)
+    -- Skip if no character or required parts
+    if not character or not character:FindFirstChild("HumanoidRootPart") or 
+       not character:FindFirstChild("Humanoid") or not character:FindFirstChild("Head") then
+        return
+    end
+    
+    -- Check team status if team check is enabled
+    local isFriendly = false
+    if espSettings.teamCheck and player.Team and targetPlayer.Team then
+        isFriendly = player.Team == targetPlayer.Team
+    end
+    
+    if espSettings.teamCheck and isFriendly then
+        -- Don't ESP teammates if team check is on
+        return
+    end
+    
+    -- Determine color
+    local espColor = Color3.fromRGB(255, 0, 0) -- Enemy (red)
+    
+    if espSettings.teamColor and targetPlayer.Team then
+        espColor = targetPlayer.TeamColor.Color
+    elseif isFriendly then
+        espColor = Color3.fromRGB(0, 255, 0) -- Friendly (green)
+    end
+    
+    -- Create ESP container
+    local espContainer = Instance.new("Folder")
+    espContainer.Name = "KILASIK_ESP_Container"
+    espContainer.Parent = character
+    
+    -- Create box ESP
+    if espSettings.boxes then
+        local box = Instance.new("BoxHandleAdornment")
+        box.Name = "BoxESP"
+        box.Adornee = character.HumanoidRootPart
+        box.AlwaysOnTop = true
+        box.ZIndex = 10
+        box.Size = character.HumanoidRootPart.Size + Vector3.new(2, 5, 2)
+        box.Transparency = 0.7
+        box.Color3 = espColor
+        box.Parent = espContainer
+    end
+    
+    -- Create name ESP
+    if espSettings.names then
+        local nameTag = Instance.new("BillboardGui")
+        nameTag.Name = "NameESP"
+        nameTag.Adornee = character.Head
+        nameTag.Size = UDim2.new(0, 200, 0, 50)
+        nameTag.StudsOffset = Vector3.new(0, 2, 0)
+        nameTag.AlwaysOnTop = true
+        
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Name = "PlayerName"
+        nameLabel.Size = UDim2.new(1, 0, 0, 20)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = targetPlayer.Name
+        nameLabel.TextColor3 = espColor
+        nameLabel.TextStrokeTransparency = 0.5
+        nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+        nameLabel.Font = Enum.Font.SourceSansBold
+        nameLabel.TextSize = 18
+        nameLabel.Parent = nameTag
+        
+        -- Create distance label
+        local distanceLabel = Instance.new("TextLabel")
+        distanceLabel.Name = "Distance"
+        distanceLabel.Size = UDim2.new(1, 0, 0, 20)
+        distanceLabel.Position = UDim2.new(0, 0, 0, 20)
+        distanceLabel.BackgroundTransparency = 1
+        distanceLabel.Text = "0m"
+        distanceLabel.TextColor3 = espColor
+        distanceLabel.TextStrokeTransparency = 0.5
+        distanceLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+        distanceLabel.Font = Enum.Font.SourceSans
+        distanceLabel.TextSize = 16
+        distanceLabel.Parent = nameTag
+        
+        nameTag.Parent = espContainer
+    end
+    
+    -- Create health bar
+    if espSettings.showHealthBar then
+        local healthGui = Instance.new("BillboardGui")
+        healthGui.Name = "HealthESP"
+        healthGui.Adornee = character.Head
+        healthGui.Size = UDim2.new(0, 100, 0, 10)
+        healthGui.StudsOffset = Vector3.new(0, 3.5, 0)
+        healthGui.AlwaysOnTop = true
+        
+        local healthBack = Instance.new("Frame")
+        healthBack.Name = "Background"
+        healthBack.Size = UDim2.new(1, 0, 1, 0)
+        healthBack.BackgroundColor3 = Color3.new(0, 0, 0)
+        healthBack.BorderSizePixel = 1
+        healthBack.BorderColor3 = Color3.new(0, 0, 0)
+        healthBack.Parent = healthGui
+        
+        local healthBar = Instance.new("Frame")
+        healthBar.Name = "Bar"
+        healthBar.Size = UDim2.new(1, 0, 1, 0)
+        healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+        healthBar.BorderSizePixel = 0
+        healthBar.Parent = healthBack
+        
+        -- Update health bar based on player's health
+        local humanoid = character.Humanoid
+        local healthConnection
+        
+        healthConnection = humanoid.HealthChanged:Connect(function()
+            if healthBar and healthBar.Parent then
+                local healthPercent = humanoid.Health / humanoid.MaxHealth
+                healthBar.Size = UDim2.new(healthPercent, 0, 1, 0)
+                
+                -- Change color based on health
+                if healthPercent > 0.5 then
+                    -- Green to yellow gradient
+                    local g = 1
+                    local r = 2 * (1 - healthPercent)
+                    healthBar.BackgroundColor3 = Color3.fromRGB(r * 255, g * 255, 0)
+                else
+                    -- Yellow to red gradient
+                    local r = 1
+                    local g = 2 * healthPercent
+                    healthBar.BackgroundColor3 = Color3.fromRGB(r * 255, g * 255, 0)
+                end
+            else
+                healthConnection:Disconnect()
+            end
+        end)
+        
+        -- Initial health update
+        local healthPercent = humanoid.Health / humanoid.MaxHealth
+        healthBar.Size = UDim2.new(healthPercent, 0, 1, 0)
+        
+        healthGui.Parent = espContainer
+    end
+    
+    -- Create tracers
+    if espSettings.tracers then
+        local tracer = Instance.new("Beam")
+        tracer.Name = "TracerESP"
+        tracer.FaceCamera = true
+        tracer.Transparency = NumberSequence.new(0.2)
+        tracer.Color = ColorSequence.new(espColor)
+        tracer.Width0 = 0.1
+        tracer.Width1 = 0.1
+        
+        -- Create attachments for the beam
+        local att1 = Instance.new("Attachment")
+        att1.Name = "TracerOrigin"
+        att1.Parent = camera.CFrame.Position
+        
+        local att2 = Instance.new("Attachment")
+        att2.Name = "TracerEnd"
+        att2.Parent = character.HumanoidRootPart
+        
+        tracer.Attachment0 = att1
+        tracer.Attachment1 = att2
+        tracer.Parent = espContainer
+    end
+    
+    -- Create chams (highlights)
+    if espSettings.chams then
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "ChamsESP"
+        highlight.FillColor = espColor
+        highlight.OutlineColor = espColor
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+        highlight.Adornee = character
+        highlight.Parent = espContainer
+    end
+end
+
+-- Clean up ESP for a player
+function cleanupESP(target)
+    if target.Character then
+        -- Remove ESP containers
+        for _, obj in ipairs(target.Character:GetChildren()) do
+            if obj.Name == "KILASIK_ESP_Container" then
+                obj:Destroy()
+            end
+        end
+        
+        -- Remove highlights
+        local highlight = target.Character:FindFirstChild("KILASIK_ESP_Highlight")
+        if highlight then
+            highlight:Destroy()
+        end
+    end
+end
+
+-- Update ESP elements
+function updateESP()
+    if not espSettings.enabled or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        return
+    end
+    
+    local playerPos = player.Character.HumanoidRootPart.Position
+    
+    -- Update ESP for each player
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character and
+           otherPlayer.Character:FindFirstChild("HumanoidRootPart") and
+           otherPlayer.Character:FindFirstChild("Humanoid") then
+            
+            local character = otherPlayer.Character
+            local distance = (character.HumanoidRootPart.Position - playerPos).Magnitude
+            
+            -- Skip if too far
+            if distance > espSettings.maxDistance then
+                cleanupESP(otherPlayer)
+                continue
+            end
+            
+            -- Check team status
+            local isFriendly = false
+            if espSettings.teamCheck and player.Team and otherPlayer.Team then
+                isFriendly = player.Team == otherPlayer.Team
+            end
+            
+            if espSettings.teamCheck and isFriendly then
+                -- Don't ESP teammates if team check is on
+                cleanupESP(otherPlayer)
+                continue
+            end
+            
+            -- Get or create ESP container
+            local espContainer = character:FindFirstChild("KILASIK_ESP_Container")
+            if not espContainer then
+                addESPToPlayer(otherPlayer)
+                espContainer = character:FindFirstChild("KILASIK_ESP_Container")
+                if not espContainer then continue end -- Skip if creation failed
+            end
+            
+            -- Update ESP elements
+            
+            -- Update distance text
+            if espSettings.names then
+                local nameESP = espContainer:FindFirstChild("NameESP")
+                if nameESP then
+                    local distanceLabel = nameESP:FindFirstChild("Distance")
+                    if distanceLabel then
+                        distanceLabel.Text = math.floor(distance) .. "m"
+                    end
+                end
+            end
+            
+            -- Update tracers
+            if espSettings.tracers then
+                local tracer = espContainer:FindFirstChild("TracerESP")
+                if tracer and tracer:IsA("Beam") then
+                    -- Update beam origin to bottom center of screen
+                    local viewportSize = camera.ViewportSize
+                    local screenCenter = Vector2.new(viewportSize.X/2, viewportSize.Y)
+                    local worldPos = camera:ScreenPointToRay(screenCenter.X, screenCenter.Y).Origin
+                    
+                    if tracer.Attachment0 then
+                        tracer.Attachment0.Position = worldPos
+                    end
+                end
+            end
+        end
+    end
+end
