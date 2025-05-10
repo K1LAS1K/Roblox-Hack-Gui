@@ -1,0 +1,1073 @@
+-- Open GUI scale settings
+function openGuiScaleSettings()
+    -- Create settings frame
+    local settingsFrame = Instance.new("Frame")
+    settingsFrame.Name = "GuiScaleSettingsFrame"
+    settingsFrame.Size = UDim2.new(0, 300, 0, 200)
+    settingsFrame.Position = UDim2.new(0.5, -150, 0.5, -100)
+    settingsFrame.BackgroundColor3 = colors.background
+    settingsFrame.BorderSizePixel = 0
+    settingsFrame.Active = true
+    settingsFrame.Draggable = true
+    
+    local cornerRadius = Instance.new("UICorner")
+    cornerRadius.CornerRadius = UDim.new(0, 10)
+    cornerRadius.Parent = settingsFrame
+    
+    -- Title
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0, 30)
+    titleLabel.BackgroundColor3 = colors.header
+    titleLabel.BorderSizePixel = 0
+    titleLabel.Text = "GUI Scale Settings"
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 16
+    titleLabel.TextColor3 = colors.text
+    titleLabel.Parent = settingsFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 10)
+    titleCorner.Parent = titleLabel
+    
+    local titleCover = Instance.new("Frame")
+    titleCover.Size = UDim2.new(1, 0, 0, 10)
+    titleCover.Position = UDim2.new(0, 0, 1, -10)
+    titleCover.BackgroundColor3 = colors.header
+    titleCover.BorderSizePixel = 0
+    titleCover.ZIndex = 0
+    titleCover.Parent = titleLabel
+    
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 24, 0, 24)
+    closeBtn.Position = UDim2.new(1, -27, 0, 3)
+    closeBtn.BackgroundColor3 = colors.warning
+    closeBtn.Text = "X"
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 14
+    closeBtn.TextColor3 = colors.text
+    closeBtn.Parent = titleLabel
+    
+    local closeBtnCorner = Instance.new("UICorner")
+    closeBtnCorner.CornerRadius = UDim.new(0, 4)
+    closeBtnCorner.Parent = closeBtn
+    
+    -- Settings container
+    local settingsContainer = Instance.new("Frame")
+    settingsContainer.Size = UDim2.new(1, -20, 1, -40)
+    settingsContainer.Position = UDim2.new(0, 10, 0, 35)
+    settingsContainer.BackgroundTransparency = 1
+    settingsContainer.BorderSizePixel = 0
+    settingsContainer.Parent = settingsFrame
+    
+    -- Info text
+    local infoText = Instance.new("TextLabel")
+    infoText.Size = UDim2.new(1, 0, 0, 40)
+    infoText.Position = UDim2.new(0, 0, 0, 10)
+    infoText.BackgroundTransparency = 1
+    infoText.Text = "Adjust the size of the GUI by dragging from the corners"
+    infoText.Font = Enum.Font.Gotham
+    infoText.TextSize = 12
+    infoText.TextWrapped = true
+    infoText.TextColor3 = colors.text
+    infoText.Parent = settingsContainer
+    
+    -- Scale options
+    local smallBtn = Instance.new("TextButton")
+    smallBtn.Size = UDim2.new(0.3, -10, 0, 40)
+    smallBtn.Position = UDim2.new(0, 0, 0, 60)
+    smallBtn.BackgroundColor3 = colors.button
+    smallBtn.Text = "Small"
+    smallBtn.Font = Enum.Font.Gotham
+    smallBtn.TextSize = 14
+    smallBtn.TextColor3 = colors.text
+    smallBtn.BorderSizePixel = 0
+    smallBtn.Parent = settingsContainer
+    
+    local smallBtnCorner = Instance.new("UICorner")
+    smallBtnCorner.CornerRadius = UDim.new(0, 6)
+    smallBtnCorner.Parent = smallBtn
+    
+    local mediumBtn = Instance.new("TextButton")
+    mediumBtn.Size = UDim2.new(0.3, -10, 0, 40)
+    mediumBtn.Position = UDim2.new(0.35, 0, 0, 60)
+    mediumBtn.BackgroundColor3 = colors.button
+    mediumBtn.Text = "Medium"
+    mediumBtn.Font = Enum.Font.Gotham
+    mediumBtn.TextSize = 14
+    mediumBtn.TextColor3 = colors.text
+    mediumBtn.BorderSizePixel = 0
+    mediumBtn.Parent = settingsContainer
+    
+    local mediumBtnCorner = Instance.new("UICorner")
+    mediumBtnCorner.CornerRadius = UDim.new(0, 6)
+    mediumBtnCorner.Parent = mediumBtn
+    
+    local largeBtn = Instance.new("TextButton")
+    largeBtn.Size = UDim2.new(0.3, -10, 0, 40)
+    largeBtn.Position = UDim2.new(0.7, 0, 0, 60)
+    largeBtn.BackgroundColor3 = colors.button
+    largeBtn.Text = "Large"
+    largeBtn.Font = Enum.Font.Gotham
+    largeBtn.TextSize = 14
+    largeBtn.TextColor3 = colors.text
+    largeBtn.BorderSizePixel = 0
+    largeBtn.Parent = settingsContainer
+    
+    local largeBtnCorner = Instance.new("UICorner")
+    largeBtnCorner.CornerRadius = UDim.new(0, 6)
+    largeBtnCorner.Parent = largeBtn
+    
+    -- Reset button
+    local resetBtn = Instance.new("TextButton")
+    resetBtn.Size = UDim2.new(1, 0, 0, 40)
+    resetBtn.Position = UDim2.new(0, 0, 0, 110)
+    resetBtn.BackgroundColor3 = colors.highlight
+    resetBtn.Text = "Reset to Default"
+    resetBtn.Font = Enum.Font.GothamBold
+    resetBtn.TextSize = 14
+    resetBtn.TextColor3 = colors.text
+    resetBtn.BorderSizePixel = 0
+    resetBtn.Parent = settingsContainer
+    
+    local resetBtnCorner = Instance.new("UICorner")
+    resetBtnCorner.CornerRadius = UDim.new(0, 6)
+    resetBtnCorner.Parent = resetBtn
+    
+    -- Button functions
+    smallBtn.MouseButton1Click:Connect(function()
+        local mainFrame = findMainGUI():FindFirstChild("MainFrame")
+        if mainFrame then
+            mainFrame.Size = UDim2.new(0, 400, 0, 250)
+            saveGuiSettings()
+        end
+    end)
+    
+    mediumBtn.MouseButton1Click:Connect(function()
+        local mainFrame = findMainGUI():FindFirstChild("MainFrame")
+        if mainFrame then
+            mainFrame.Size = UDim2.new(0, 550, 0, 350)
+            saveGuiSettings()
+        end
+    end)
+    
+    largeBtn.MouseButton1Click:Connect(function()
+        local mainFrame = findMainGUI():FindFirstChild("MainFrame")
+        if mainFrame then
+            mainFrame.Size = UDim2.new(0, 700, 0, 450)
+            saveGuiSettings()
+        end
+    end)
+    
+    resetBtn.MouseButton1Click:Connect(function()
+        local mainFrame = findMainGUI():FindFirstChild("MainFrame")
+        if mainFrame then
+            mainFrame.Size = originalGuiSize
+            saveGuiSettings()
+        end
+    end)
+    
+    -- Close button functionality
+    closeBtn.MouseButton1Click:Connect(function()
+        settingsFrame:Destroy()
+    end)
+    
+    -- Parent to GUI
+    local gui = findMainGUI()
+    if gui then
+        settingsFrame.Parent = gui
+    else
+        settingsFrame.Parent = player.PlayerGui
+    end
+    
+    return settingsFrame
+end
+
+-- Reset all settings to defaults
+function resetAllSettings()
+    -- Reset ESP settings
+    espSettings = {
+        enabled = false,
+        boxes = true,
+        names = true,
+        distances = true,
+        teamCheck = true,
+        teamColor = true,
+        tracers = false,
+        chams = false,
+        showHealthBar = true,
+        maxDistance = 1000
+    }
+    
+    -- Reset aimbot settings
+    aimbotSettings = {
+        enabled = false,
+        teamCheck = true,
+        visibilityCheck = true,
+        aimPart = "Head",
+        sensitivity = 0.5,
+        fovSize = 100,
+        showFOV = true,
+        toggleKey = "B",
+        wallbangEnabled = false
+    }
+    
+    -- Reset keybind settings
+    keyBindSettings = {
+        Fly = {key = "F", enabled = false},
+        Noclip = {key = "N", enabled = false},
+        Speed = {key = "LeftShift", enabled = false},
+        ESP = {key = "E", enabled = false},
+        Aimbot = {key = "B", enabled = false},
+        ClickTP = {key = "LeftControl", enabled = false},
+        Reset = {key = "R", enabled = false},
+        InfiniteJump = {key = "Space", enabled = false}
+    }
+    
+    -- Reset colors
+    colors = {
+        background = Color3.fromRGB(25, 25, 30),
+        header = Color3.fromRGB(35, 35, 40),
+        button = Color3.fromRGB(45, 45, 55),
+        buttonHover = Color3.fromRGB(55, 55, 65),
+        buttonSelected = Color3.fromRGB(65, 105, 225),
+        text = Color3.fromRGB(240, 240, 240),
+        highlight = Color3.fromRGB(65, 105, 225),
+        warning = Color3.fromRGB(200, 60, 60),
+        success = Color3.fromRGB(60, 180, 75),
+        neutralLight = Color3.fromRGB(70, 70, 85),
+        neutralDark = Color3.fromRGB(40, 40, 50),
+        shadow = Color3.fromRGB(15, 15, 20),
+        categoryBG = Color3.fromRGB(30, 30, 35),
+        favorite = Color3.fromRGB(255, 215, 0)
+    }
+    
+    -- Reset favorites
+    favoriteCommands = {}
+    
+    -- Save all settings
+    saveSettings()
+    
+    -- Recreate GUI for the changes to take effect
+    local gui = findMainGUI()
+    if gui then
+        gui:Destroy()
+    end
+    
+    -- Rebuild GUI
+    createMainGUI()
+    
+    setStatus("All settings reset to defaults")
+end
+
+-- Save current GUI settings
+function saveGuiSettings()
+    local mainFrame = findMainGUI():FindFirstChild("MainFrame")
+    if mainFrame then
+        pcall(function()
+            if writefile then
+                local settings = {
+                    size = {
+                        width = mainFrame.Size.X.Offset,
+                        height = mainFrame.Size.Y.Offset
+                    }
+                }
+                
+                writefile("KILASIK_gui_settings.json", HttpService:JSONEncode(settings))
+            end
+        end)
+    end
+end
+
+-- Load GUI settings
+function loadGuiSettings()
+    pcall(function()
+        if readfile and isfile and isfile("KILASIK_gui_settings.json") then
+            local success, settings = pcall(function()
+                return HttpService:JSONDecode(readfile("KILASIK_gui_settings.json"))
+            end)
+            
+            if success and settings.size then
+                return UDim2.new(0, settings.size.width, 0, settings.size.height)
+            end
+        end
+    end)
+    
+    return originalGuiSize
+end
+
+-- Open color settings menu
+function openColorSettings()
+    -- Create settings frame
+    local settingsFrame = Instance.new("Frame")
+    settingsFrame.Name = "ColorSettingsFrame"
+    settingsFrame.Size = UDim2.new(0, 300, 0, 400)
+    settingsFrame.Position = UDim2.new(0.5, -150, 0.5, -200)
+    settingsFrame.BackgroundColor3 = colors.background
+    settingsFrame.BorderSizePixel = 0
+    settingsFrame.Active = true
+    settingsFrame.Draggable = true
+    
+    local cornerRadius = Instance.new("UICorner")
+    cornerRadius.CornerRadius = UDim.new(0, 10)
+    cornerRadius.Parent = settingsFrame
+    
+    -- Title
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0, 30)
+    titleLabel.BackgroundColor3 = colors.header
+    titleLabel.BorderSizePixel = 0
+    titleLabel.Text = "Color Settings"
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 16
+    titleLabel.TextColor3 = colors.text
+    titleLabel.Parent = settingsFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 10)
+    titleCorner.Parent = titleLabel
+    
+    local titleCover = Instance.new("Frame")
+    titleCover.Size = UDim2.new(1, 0, 0, 10)
+    titleCover.Position = UDim2.new(0, 0, 1, -10)
+    titleCover.BackgroundColor3 = colors.header
+    titleCover.BorderSizePixel = 0
+    titleCover.ZIndex = 0
+    titleCover.Parent = titleLabel
+    
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 24, 0, 24)
+    closeBtn.Position = UDim2.new(1, -27, 0, 3)
+    closeBtn.BackgroundColor3 = colors.warning
+    closeBtn.Text = "X"
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 14
+    closeBtn.TextColor3 = colors.text
+    closeBtn.Parent = titleLabel
+    
+    local closeBtnCorner = Instance.new("UICorner")
+    closeBtnCorner.CornerRadius = UDim.new(0, 4)
+    closeBtnCorner.Parent = closeBtn
+    
+    -- Settings container
+    local settingsContainer = Instance.new("ScrollingFrame")
+    settingsContainer.Size = UDim2.new(1, -20, 1, -40)
+    settingsContainer.Position = UDim2.new(0, 10, 0, 35)
+    settingsContainer.BackgroundTransparency = 1
+    settingsContainer.BorderSizePixel = 0
+    settingsContainer.ScrollBarThickness = 4
+    settingsContainer.ScrollingDirection = Enum.ScrollingDirection.Y
+    settingsContainer.CanvasSize = UDim2.new(0, 0, 0, 600)
+    settingsContainer.Parent = settingsFrame
+    
+    -- Preset themes
+    local themesTitle = Instance.new("TextLabel")
+    themesTitle.Size = UDim2.new(1, 0, 0, 30)
+    themesTitle.BackgroundTransparency = 1
+    themesTitle.Text = "Preset Themes"
+    themesTitle.Font = Enum.Font.GothamBold
+    themesTitle.TextSize = 16
+    themesTitle.TextColor3 = colors.text
+    themesTitle.Parent = settingsContainer
+    
+    -- Preset theme buttons
+    local themes = {
+        {name = "Dark Blue", primary = Color3.fromRGB(35, 35, 50), secondary = Color3.fromRGB(65, 105, 225)},
+        {name = "Dark Red", primary = Color3.fromRGB(40, 30, 30), secondary = Color3.fromRGB(180, 60, 60)},
+        {name = "Dark Green", primary = Color3.fromRGB(30, 40, 30), secondary = Color3.fromRGB(60, 180, 75)},
+        {name = "Dark Purple", primary = Color3.fromRGB(40, 30, 50), secondary = Color3.fromRGB(130, 60, 200)},
+        {name = "Neon", primary = Color3.fromRGB(20, 20, 20), secondary = Color3.fromRGB(0, 255, 140)}
+    }
+    
+    local themeButtons = {}
+    for i, theme in ipairs(themes) do
+        local themeBtn = Instance.new("Frame")
+        themeBtn.Size = UDim2.new(0.48, 0, 0, 70)
+        themeBtn.Position = UDim2.new(i % 2 == 0 and 0.52 or 0, 0, 0, 40 + math.floor((i-1) / 2) * 80)
+        themeBtn.BackgroundColor3 = theme.primary
+        themeBtn.BorderSizePixel = 0
+        themeBtn.Parent = settingsContainer
+        
+        local themeBtnCorner = Instance.new("UICorner")
+        themeBtnCorner.CornerRadius = UDim.new(0, 6)
+        themeBtnCorner.Parent = themeBtn
+        
+        local themeAccent = Instance.new("Frame")
+        themeAccent.Size = UDim2.new(0, 10, 1, 0)
+        themeAccent.Position = UDim2.new(0, 0, 0, 0)
+        themeAccent.BackgroundColor3 = theme.secondary
+        themeAccent.BorderSizePixel = 0
+        themeAccent.Parent = themeBtn
+        
+        local themeAccentCorner = Instance.new("UICorner")
+        themeAccentCorner.CornerRadius = UDim.new(0, 6)
+        themeAccentCorner.Parent = themeAccent
+        
+        local coverFrame = Instance.new("Frame")
+        coverFrame.Size = UDim2.new(0, 5, 1, 0)
+        coverFrame.Position = UDim2.new(0, 5, 0, 0)
+        coverFrame.BackgroundColor3 = theme.primary
+        coverFrame.BorderSizePixel = 0
+        coverFrame.ZIndex = 2
+        coverFrame.Parent = themeBtn
+        
+        local themeName = Instance.new("TextLabel")
+        themeName.Size = UDim2.new(1, -20, 1, 0)
+        themeName.Position = UDim2.new(0, 20, 0, 0)
+        themeName.BackgroundTransparency = 1
+        themeName.Text = theme.name
+        themeName.Font = Enum.Font.GothamBold
+        themeName.TextSize = 16
+        themeName.TextColor3 = Color3.fromRGB(255, 255, 255)
+        themeName.TextXAlignment = Enum.TextXAlignment.Left
+        themeName.Parent = themeBtn
+        
+        local themeButton = Instance.new("TextButton")
+        themeButton.Size = UDim2.new(1, 0, 1, 0)
+        themeButton.BackgroundTransparency = 1
+        themeButton.Text = ""
+        themeButton.Parent = themeBtn
+        
+        themeButton.MouseButton1Click:Connect(function()
+            applyColorTheme(theme.primary, theme.secondary)
+        end)
+        
+        table.insert(themeButtons, themeBtn)
+    end
+    
+    -- Apply button at the bottom
+    local applyBtn = Instance.new("TextButton")
+    applyBtn.Size = UDim2.new(1, 0, 0, 40)
+    applyBtn.Position = UDim2.new(0, 0, 0, 550)
+    applyBtn.BackgroundColor3 = colors.highlight
+    applyBtn.Text = "Apply Colors"
+    applyBtn.Font = Enum.Font.GothamBold
+    applyBtn.TextSize = 16
+    applyBtn.TextColor3 = colors.text
+    applyBtn.BorderSizePixel = 0
+    applyBtn.Parent = settingsContainer
+    
+    local applyBtnCorner = Instance.new("UICorner")
+    applyBtnCorner.CornerRadius = UDim.new(0, 6)
+    applyBtnCorner.Parent = applyBtn
+    
+    applyBtn.MouseButton1Click:Connect(function()
+        -- Apply custom colors
+        saveSettings()
+        
+        -- Recreate GUI
+        local gui = findMainGUI()
+        if gui then
+            gui:Destroy()
+        end
+        
+        createMainGUI()
+        settingsFrame:Destroy()
+    end)
+    
+    -- Close button functionality
+    closeBtn.MouseButton1Click:Connect(function()
+        settingsFrame:Destroy()
+    end)
+    
+    -- Parent to GUI
+    local gui = findMainGUI()
+    if gui then
+        settingsFrame.Parent = gui
+    else
+        settingsFrame.Parent = player.PlayerGui
+    end
+    
+    return settingsFrame
+end
+
+-- Apply a color theme
+function applyColorTheme(primary, secondary)
+    -- Update colors
+    colors.background = primary
+    colors.header = Color3.new(
+        primary.R * 1.2,
+        primary.G * 1.2,
+        primary.B * 1.2
+    )
+    colors.button = Color3.new(
+        primary.R * 1.5,
+        primary.G * 1.5, 
+        primary.B * 1.5
+    )
+    colors.buttonHover = Color3.new(
+        primary.R * 1.8,
+        primary.G * 1.8,
+        primary.B * 1.8
+    )
+    colors.buttonSelected = secondary
+    colors.highlight = secondary
+    colors.categoryBG = Color3.new(
+        primary.R * 1.1,
+        primary.G * 1.1,
+        primary.B * 1.1
+    )
+    
+    setStatus("Color theme applied")
+    saveSettings()
+}
+
+-- Save settings to file
+function saveSettings()
+    pcall(function()
+        if writefile then
+            local settings = {
+                esp = espSettings,
+                aimbot = aimbotSettings,
+                keyBinds = keyBindSettings,
+                favorites = favoriteCommands,
+                colors = {
+                    background = {colors.background.R, colors.background.G, colors.background.B},
+                    header = {colors.header.R, colors.header.G, colors.header.B},
+                    button = {colors.button.R, colors.button.G, colors.button.B},
+                    buttonHover = {colors.buttonHover.R, colors.buttonHover.G, colors.buttonHover.B},
+                    buttonSelected = {colors.buttonSelected.R, colors.buttonSelected.G, colors.buttonSelected.B},
+                    highlight = {colors.highlight.R, colors.highlight.G, colors.highlight.B},
+                    categoryBG = {colors.categoryBG.R, colors.categoryBG.G, colors.categoryBG.B}
+                }
+            }
+            
+            writefile("KILASIK_settings.json", HttpService:JSONEncode(settings))
+        end
+    end)
+end
+
+-- Load settings from file
+function loadSettings()
+    pcall(function()
+        if readfile and isfile and isfile("KILASIK_settings.json") then
+            local success, settings = pcall(function()
+                return HttpService:JSONDecode(readfile("KILASIK_settings.json"))
+            end)
+            
+            if success then
+                -- Load ESP settings
+                if settings.esp then
+                    for key, value in pairs(settings.esp) do
+                        espSettings[key] = value
+                    end
+                end
+                
+                -- Load aimbot settings
+                if settings.aimbot then
+                    for key, value in pairs(settings.aimbot) do
+                        aimbotSettings[key] = value
+                    end
+                end
+                
+                -- Load keybind settings
+                if settings.keyBinds then
+                    for key, value in pairs(settings.keyBinds) do
+                        keyBindSettings[key] = value
+                    end
+                end
+                
+                -- Load favorites
+                if settings.favorites then
+                    favoriteCommands = settings.favorites
+                end
+                
+                -- Load colors
+                if settings.colors then
+                    if settings.colors.background then
+                        colors.background = Color3.new(
+                            settings.colors.background[1],
+                            settings.colors.background[2],
+                            settings.colors.background[3]
+                        )
+                    end
+                    
+                    if settings.colors.header then
+                        colors.header = Color3.new(
+                            settings.colors.header[1],
+                            settings.colors.header[2],
+                            settings.colors.header[3]
+                        )
+                    end
+                    
+                    if settings.colors.button then
+                        colors.button = Color3.new(
+                            settings.colors.button[1],
+                            settings.colors.button[2],
+                            settings.colors.button[3]
+                        )
+                    end
+                    
+                    if settings.colors.buttonHover then
+                        colors.buttonHover = Color3.new(
+                            settings.colors.buttonHover[1],
+                            settings.colors.buttonHover[2],
+                            settings.colors.buttonHover[3]
+                        )
+                    end
+                    
+                    if settings.colors.buttonSelected then
+                        colors.buttonSelected = Color3.new(
+                            settings.colors.buttonSelected[1],
+                            settings.colors.buttonSelected[2],
+                            settings.colors.buttonSelected[3]
+                        )
+                    end
+                    
+                    if settings.colors.highlight then
+                        colors.highlight = Color3.new(
+                            settings.colors.highlight[1],
+                            settings.colors.highlight[2],
+                            settings.colors.highlight[3]
+                        )
+                    end
+                    
+                    if settings.colors.categoryBG then
+                        colors.categoryBG = Color3.new(
+                            settings.colors.categoryBG[1],
+                            settings.colors.categoryBG[2],
+                            settings.colors.categoryBG[3]
+                        )
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- Set aimbot FOV size
+function setAimbotFOV(size)
+    aimbotSettings.fovSize = size
+    
+    -- Update FOV circle if it exists
+    if aimbotSettings.enabled and aimbotSettings.showFOV then
+        pcall(function()
+            -- Remove existing FOV circle
+            if getgenv().FOVCircle then
+                getgenv().FOVCircle:Remove()
+            end
+            
+            -- Create new FOV circle
+            local fovcircle = Drawing.new("Circle")
+            fovcircle.Visible = true
+            fovcircle.Radius = size
+            fovcircle.Thickness = 1
+            fovcircle.Transparency = 1
+            fovcircle.Color = Color3.fromRGB(255, 255, 255)
+            fovcircle.Position = camera.ViewportSize / 2
+            
+            getgenv().FOVCircle = fovcircle
+        end)
+    end
+    
+    setStatus("Aimbot FOV size set to: " .. size)
+}
+
+-- Toggle clickTP
+function toggleClickTP()
+    local clickTPEnabled = not getgenv().ClickTPEnabled
+    
+    if clickTPEnabled then
+        if getgenv().ClickTPConnection then
+            getgenv().ClickTPConnection:Disconnect()
+            getgenv().ClickTPConnection = nil
+        end
+        
+        getgenv().ClickTPConnection = mouse.Button1Down:Connect(function()
+            if UserInputService:IsKeyDown(Enum.KeyCode[keyBindSettings.ClickTP.key]) then
+                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    player.Character.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 5, 0))
+                end
+            end
+        end)
+        setStatus("Click Teleport enabled - " .. keyBindSettings.ClickTP.key .. "+Click to teleport")
+    else
+        if getgenv().ClickTPConnection then
+            getgenv().ClickTPConnection:Disconnect()
+            getgenv().ClickTPConnection = nil
+        end
+        setStatus("Click Teleport disabled")
+    end
+    
+    getgenv().ClickTPEnabled = clickTPEnabled
+    keyBindSettings.ClickTP.enabled = clickTPEnabled
+    saveSettings()
+}
+
+-- Open player selection menu for various commands
+function openPlayerSelectionMenu(action)
+    -- Create selection frame
+    local selectionFrame = Instance.new("Frame")
+    selectionFrame.Name = "PlayerSelectionFrame"
+    selectionFrame.Size = UDim2.new(0, 300, 0, 350)
+    selectionFrame.Position = UDim2.new(0.5, -150, 0.5, -175)
+    selectionFrame.BackgroundColor3 = colors.background
+    selectionFrame.BorderSizePixel = 0
+    selectionFrame.Active = true
+    selectionFrame.Draggable = true
+    
+    local cornerRadius = Instance.new("UICorner")
+    cornerRadius.CornerRadius = UDim.new(0, 10)
+    cornerRadius.Parent = selectionFrame
+    
+    -- Title
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0, 30)
+    titleLabel.BackgroundColor3 = colors.header
+    titleLabel.BorderSizePixel = 0
+    
+    -- Set title based on action
+    if action == "tp" then
+        titleLabel.Text = "Teleport to Player"
+    elseif action == "spectate" then
+        titleLabel.Text = "Spectate Player"
+    elseif action == "goto" then
+        titleLabel.Text = "Go to Player"
+    elseif action == "bring" then
+        titleLabel.Text = "Bring Player"
+    elseif action == "fling" then
+        titleLabel.Text = "Fling Player"
+    else
+        titleLabel.Text = "Select Player"
+    end
+    
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 16
+    titleLabel.TextColor3 = colors.text
+    titleLabel.Parent = selectionFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 10)
+    titleCorner.Parent = titleLabel
+    
+    local titleCover = Instance.new("Frame")
+    titleCover.Size = UDim2.new(1, 0, 0, 10)
+    titleCover.Position = UDim2.new(0, 0, 1, -10)
+    titleCover.BackgroundColor3 = colors.header
+    titleCover.BorderSizePixel = 0
+    titleCover.ZIndex = 0
+    titleCover.Parent = titleLabel
+    
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 24, 0, 24)
+    closeBtn.Position = UDim2.new(1, -27, 0, 3)
+    closeBtn.BackgroundColor3 = colors.warning
+    closeBtn.Text = "X"
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 14
+    closeBtn.TextColor3 = colors.text
+    closeBtn.Parent = titleLabel
+    
+    local closeBtnCorner = Instance.new("UICorner")
+    closeBtnCorner.CornerRadius = UDim.new(0, 4)
+    closeBtnCorner.Parent = closeBtn
+    
+    -- Player container
+    local playerContainer = Instance.new("ScrollingFrame")
+    playerContainer.Size = UDim2.new(1, -20, 1, -40)
+    playerContainer.Position = UDim2.new(0, 10, 0, 35)
+    playerContainer.BackgroundTransparency = 1
+    playerContainer.BorderSizePixel = 0
+    playerContainer.ScrollBarThickness = 4
+    playerContainer.ScrollingDirection = Enum.ScrollingDirection.Y
+    playerContainer.CanvasSize = UDim2.new(0, 0, 0, 0) -- Will adjust based on player count
+    playerContainer.Parent = selectionFrame
+    
+    -- List layout
+    local layout = Instance.new("UIListLayout")
+    layout.Padding = UDim.new(0, 5)
+    layout.Parent = playerContainer
+    
+    -- Add players
+    local players = Players:GetPlayers()
+    
+    for i, plr in ipairs(players) do
+        if plr ~= player then -- Don't include local player
+            local playerButton = Instance.new("Frame")
+            playerButton.Size = UDim2.new(1, 0, 0, 50)
+            playerButton.BackgroundColor3 = colors.button
+            playerButton.BorderSizePixel = 0
+            
+            local playerCorner = Instance.new("UICorner")
+            playerCorner.CornerRadius = UDim.new(0, 6)
+            playerCorner.Parent = playerButton
+            
+            -- Player icon (try to get avatar)
+            local playerIcon = Instance.new("ImageLabel")
+            playerIcon.Size = UDim2.new(0, 40, 0, 40)
+            playerIcon.Position = UDim2.new(0, 5, 0, 5)
+            playerIcon.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+            playerIcon.BorderSizePixel = 0
+            
+            -- Try to load player avatar
+            pcall(function()
+                local userId = plr.UserId
+                local thumbType = Enum.ThumbnailType.HeadShot
+                local thumbSize = Enum.ThumbnailSize.Size420x420
+                local content = Players:GetUserThumbnailAsync(userId, thumbType, thumbSize)
+                playerIcon.Image = content
+            end)
+            
+            local iconCorner = Instance.new("UICorner")
+            iconCorner.CornerRadius = UDim.new(0, 6)
+            iconCorner.Parent = playerIcon
+            
+            playerIcon.Parent = playerButton
+            
+            -- Player name
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Size = UDim2.new(1, -60, 0.6, 0)
+            nameLabel.Position = UDim2.new(0, 55, 0, 5)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.Text = plr.Name
+            nameLabel.Font = Enum.Font.GothamSemibold
+            nameLabel.TextSize = 14
+            nameLabel.TextColor3 = colors.text
+            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+            nameLabel.Parent = playerButton
+            
+            -- Player info (team, etc)
+            local infoLabel = Instance.new("TextLabel")
+            infoLabel.Size = UDim2.new(1, -60, 0.4, 0)
+            infoLabel.Position = UDim2.new(0, 55, 0.6, 0)
+            infoLabel.BackgroundTransparency = 1
+            infoLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+            infoLabel.Font = Enum.Font.Gotham
+            infoLabel.TextSize = 12
+            infoLabel.TextXAlignment = Enum.TextXAlignment.Left
+            
+            -- Add team info if available
+            if plr.Team then
+                infoLabel.Text = "Team: " .. plr.Team.Name
+                nameLabel.TextColor3 = plr.TeamColor.Color
+            else
+                infoLabel.Text = "No Team"
+            end
+            
+            infoLabel.Parent = playerButton
+            
+            -- Click button
+            local clickBtn = Instance.new("TextButton")
+            clickBtn.Size = UDim2.new(1, 0, 1, 0)
+            clickBtn.BackgroundTransparency = 1
+            clickBtn.Text = ""
+            clickBtn.Parent = playerButton
+            
+            -- Hover effect
+            clickBtn.MouseEnter:Connect(function()
+                playerButton.BackgroundColor3 = colors.buttonHover
+            end)
+            
+            clickBtn.MouseLeave:Connect(function()
+                playerButton.BackgroundColor3 = colors.button
+            end)
+            
+            -- Click function based on action
+            clickBtn.MouseButton1Click:Connect(function()
+                if action == "tp" or action == "goto" then
+                    teleportToPlayer(plr.Name)
+                elseif action == "spectate" then
+                    spectatePlayer(plr.Name)
+                elseif action == "bring" then
+                    bringPlayer(plr.Name)
+                elseif action == "fling" then
+                    flingPlayer(plr.Name)
+                end
+                
+                selectionFrame:Destroy()
+            end)
+            
+            playerButton.Parent = playerContainer
+        end
+    end
+    
+    -- Adjust canvas size
+    playerContainer.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 10)
+    
+    -- Close button functionality
+    closeBtn.MouseButton1Click:Connect(function()
+        selectionFrame:Destroy()
+    end)
+    
+    -- Parent to GUI
+    local gui = findMainGUI()
+    if gui then
+        selectionFrame.Parent = gui
+    else
+        selectionFrame.Parent = player.PlayerGui
+    end
+    
+    return selectionFrame
+end
+
+-- Open fake chat prompt
+function openFakeChatPrompt()
+    -- Create prompt frame
+    local promptFrame = Instance.new("Frame")
+    promptFrame.Name = "FakeChatPromptFrame"
+    promptFrame.Size = UDim2.new(0, 300, 0, 150)
+    promptFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+    promptFrame.BackgroundColor3 = colors.background
+    promptFrame.BorderSizePixel = 0
+    promptFrame.Active = true
+    promptFrame.Draggable = true
+    
+    local cornerRadius = Instance.new("UICorner")
+    cornerRadius.CornerRadius = UDim.new(0, 10)
+    cornerRadius.Parent = promptFrame
+    
+    -- Title
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0, 30)
+    titleLabel.BackgroundColor3 = colors.header
+    titleLabel.BorderSizePixel = 0
+    titleLabel.Text = "Fake Chat Message"
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextSize = 16
+    titleLabel.TextColor3 = colors.text
+    titleLabel.Parent = promptFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 10)
+    titleCorner.Parent = titleLabel
+    
+    local titleCover = Instance.new("Frame")
+    titleCover.Size = UDim2.new(1, 0, 0, 10)
+    titleCover.Position = UDim2.new(0, 0, 1, -10)
+    titleCover.BackgroundColor3 = colors.header
+    titleCover.BorderSizePixel = 0
+    titleCover.ZIndex = 0
+    titleCover.Parent = titleLabel
+    
+    -- Close button
+    local closeBtn = Instance.new("TextButton")
+    closeBtn.Size = UDim2.new(0, 24, 0, 24)
+    closeBtn.Position = UDim2.new(1, -27, 0, 3)
+    closeBtn.BackgroundColor3 = colors.warning
+    closeBtn.Text = "X"
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 14
+    closeBtn.TextColor3 = colors.text
+    closeBtn.Parent = titleLabel
+    
+    local closeBtnCorner = Instance.new("UICorner")
+    closeBtnCorner.CornerRadius = UDim.new(0, 4)
+    closeBtnCorner.Parent = closeBtn
+    
+    -- Player name input
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(0.3, 0, 0, 20)
+    nameLabel.Position = UDim2.new(0, 10, 0, 40)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = "Player Name:"
+    nameLabel.Font = Enum.Font.Gotham
+    nameLabel.TextSize = 14
+    nameLabel.TextColor3 = colors.text
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Parent = promptFrame
+    
+    local nameInput = Instance.new("TextBox")
+    nameInput.Size = UDim2.new(0.65, 0, 0, 30)
+    nameInput.Position = UDim2.new(0.35, 0, 0, 35)
+    nameInput.BackgroundColor3 = colors.neutralDark
+    nameInput.BorderSizePixel = 0
+    nameInput.PlaceholderText = "Enter player name..."
+    nameInput.Text = ""
+    nameInput.Font = Enum.Font.Gotham
+    nameInput.TextSize = 14
+    nameInput.TextColor3 = colors.text
+    nameInput.ClearTextOnFocus = false
+    nameInput.Parent = promptFrame
+    
+    local nameInputCorner = Instance.new("UICorner")
+    nameInputCorner.CornerRadius = UDim.new(0, 6)
+    nameInputCorner.Parent = nameInput
+    
+    -- Message input
+    local messageLabel = Instance.new("TextLabel")
+    messageLabel.Size = UDim2.new(0.3, 0, 0, 20)
+    messageLabel.Position = UDim2.new(0, 10, 0, 80)
+    messageLabel.BackgroundTransparency = 1
+    messageLabel.Text = "Message:"
+    messageLabel.Font = Enum.Font.Gotham
+    messageLabel.TextSize = 14
+    messageLabel.TextColor3 = colors.text
+    messageLabel.TextXAlignment = Enum.TextXAlignment.Left
+    messageLabel.Parent = promptFrame
+    
+    local messageInput = Instance.new("TextBox")
+    messageInput.Size = UDim2.new(0.65, 0, 0, 30)
+    messageInput.Position = UDim2.new(0.35, 0, 0, 75)
+    messageInput.BackgroundColor3 = colors.neutralDark
+    messageInput.BorderSizePixel = 0
+    messageInput.PlaceholderText = "Enter message..."
+    messageInput.Text = ""
+    messageInput.Font = Enum.Font.Gotham
+    messageInput.TextSize = 14
+    messageInput.TextColor3 = colors.text
+    messageInput.ClearTextOnFocus = false
+    messageInput.Parent = promptFrame
+    
+    local messageInputCorner = Instance.new("UICorner")
+    messageInputCorner.CornerRadius = UDim.new(0, 6)
+    messageInputCorner.Parent = messageInput
+    
+    -- Send button
+    local sendBtn = Instance.new("TextButton")
+    sendBtn.Size = UDim2.new(1, -20, 0, 30)
+    sendBtn.Position = UDim2.new(0, 10, 0, 115)
+    sendBtn.BackgroundColor3 = colors.highlight
+    sendBtn.Text = "Send Fake Message"
+    sendBtn.Font = Enum.Font.GothamBold
+    sendBtn.TextSize = 14
+    sendBtn.TextColor3 = colors.text
+    sendBtn.BorderSizePixel = 0
+    sendBtn.Parent = promptFrame
+    
+    local sendBtnCorner = Instance.new("UICorner")
+    sendBtnCorner.CornerRadius = UDim.new(0, 6)
+    sendBtnCorner.Parent = sendBtn
+    
+    -- Send button click function
+    sendBtn.MouseButton1Click:Connect(function()
+        local playerName = nameInput.Text
+        local message = messageInput.Text
+        
+        if playerName ~= "" and message ~= "" then
+            fakeChatMessage(playerName, message)
+            promptFrame:Destroy()
+        else
+            -- Highlight empty fields
+            if playerName == "" then
+                nameInput.BackgroundColor3 = colors.warning
+                delay(0.5, function()
+                    nameInput.BackgroundColor3 = colors.neutralDark
+                end)
+            end
+            
+            if message == "" then
+                messageInput.BackgroundColor3 = colors.warning
+                delay(0.5, function()
+                    messageInput.BackgroundColor3 = colors.neutralDark
+                end)
+            end
+        end
+    end)
+    
+    -- Close button functionality
+    closeBtn.MouseButton1Click:Connect(function()
+        promptFrame:Destroy()
+    end)
+    
+    -- Parent to GUI
+    local gui = findMainGUI()
+    if gui then
+        promptFrame.Parent = gui
+    else
+        promptFrame.Parent = player.PlayerGui
+    end
+    
+    return promptFrame
+end
