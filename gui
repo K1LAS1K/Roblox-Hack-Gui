@@ -1,2458 +1,2102 @@
 --[[
-  RobloxCheatGUI - Advanced Cheat Interface for Roblox
-  This script creates a fully-featured GUI with multiple cheats for Roblox games.
-  Use with executors like JJSploit.
+  Kilasik GUI - Gelişmiş Oyun Kontrol Arayüzü
+  Bu script gelişmiş özellikler sunan bir GUI oluşturur
+  
+  Kullanım: Kodu executor'a yapıştırıp çalıştırın
 ]]
 
-------------------------------
--- Services
-------------------------------
+-- Servisler
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local Teams = game:GetService("Teams")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+local TeleportService = game:GetService("TeleportService")
+local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
 
+-- Key Sistemi
+local KEY_CODE = "KILASIK2025" -- Anahtar kod
+local keyVerified = false
+
+-- Temel değişkenler
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
-------------------------------
--- Module Functions
-------------------------------
-
-------------------------------
--- UIEffects Module
-------------------------------
-local UIEffects = {}
-
--- Define standard tween times
-local FADE_TIME = 0.3
-local SLIDE_TIME = 0.5
-local BOUNCE_TIME = 0.7
-
--- Define easing styles
-local EASE_STYLES = {
-    In = Enum.EasingStyle.Sine,
-    Out = Enum.EasingStyle.Sine,
-    InOut = Enum.EasingStyle.Sine,
-    Bounce = Enum.EasingStyle.Bounce,
-    Elastic = Enum.EasingStyle.Elastic
-}
-
--- Define easing directions
-local EASE_DIRECTIONS = {
-    In = Enum.EasingDirection.In,
-    Out = Enum.EasingDirection.Out,
-    InOut = Enum.EasingDirection.InOut
-}
-
--- Apply transparency to a GUI object and its descendants
-function applyTransparency(guiObject, transparency, originalValues)
-    if not guiObject:IsA("GuiObject") then return end
-    
-    -- Store original transparency values
-    originalValues = originalValues or {}
-    originalValues[guiObject] = {
-        BackgroundTransparency = guiObject.BackgroundTransparency
-    }
-    
-    -- Apply transparency
-    guiObject.BackgroundTransparency = transparency
-    
-    -- Handle specific GUI types
-    if guiObject:IsA("TextLabel") or guiObject:IsA("TextButton") or guiObject:IsA("TextBox") then
-        originalValues[guiObject].TextTransparency = guiObject.TextTransparency
-        originalValues[guiObject].TextStrokeTransparency = guiObject.TextStrokeTransparency
-        
-        guiObject.TextTransparency = transparency
-        guiObject.TextStrokeTransparency = 1 -- Text stroke always fully transparent
-    end
-    
-    if guiObject:IsA("ImageLabel") or guiObject:IsA("ImageButton") then
-        originalValues[guiObject].ImageTransparency = guiObject.ImageTransparency
-        guiObject.ImageTransparency = transparency
-    end
-    
-    -- Apply to children
-    for _, child in ipairs(guiObject:GetChildren()) do
-        if child:IsA("GuiObject") then
-            applyTransparency(child, transparency, originalValues)
-        end
-    end
-    
-    return originalValues
-end
-
--- Fade in a UI element
-function UIEffects.fadeIn(guiObject, callback)
-    if not guiObject then return end
-    
-    -- Save original transparency
-    local originalTransparency = {}
-    local originalPos = guiObject.Position
-    
-    -- Apply initial transparency
-    guiObject.BackgroundTransparency = 1
-    applyTransparency(guiObject, 1, originalTransparency)
-    
-    -- Set initial position slightly offset
-    guiObject.Position = originalPos + UDim2.new(0, 0, 0, 20)
-    
-    -- Create tween for fade in
-    local tweenInfo = TweenInfo.new(
-        FADE_TIME,
-        EASE_STYLES.Out,
-        EASE_DIRECTIONS.Out
-    )
-    
-    local fadeGoals = {
-        Position = originalPos,
-        BackgroundTransparency = 0
-    }
-    
-    local fadeTween = TweenService:Create(guiObject, tweenInfo, fadeGoals)
-    fadeTween:Play()
-    
-    -- Also tween all children
-    for _, child in ipairs(guiObject:GetDescendants()) do
-        if child:IsA("GuiObject") and originalTransparency[child] then
-            local childTween = TweenService:Create(child, tweenInfo, {
-                BackgroundTransparency = originalTransparency[child].BackgroundTransparency or 0,
-                TextTransparency = originalTransparency[child].TextTransparency or 0,
-                TextStrokeTransparency = originalTransparency[child].TextStrokeTransparency or 1,
-                ImageTransparency = originalTransparency[child].ImageTransparency or 0
-            })
-            childTween:Play()
-        end
-    end
-    
-    -- Call callback when complete
-    if callback then
-        fadeTween.Completed:Connect(callback)
-    end
-    
-    return fadeTween
-end
-
--- Fade out a UI element
-function UIEffects.fadeOut(guiObject, callback)
-    if not guiObject then return end
-    
-    -- Create tween for fade out
-    local tweenInfo = TweenInfo.new(
-        FADE_TIME,
-        EASE_STYLES.In,
-        EASE_DIRECTIONS.In
-    )
-    
-    local fadeGoals = {
-        Position = guiObject.Position + UDim2.new(0, 0, 0, 20),
-        BackgroundTransparency = 1
-    }
-    
-    local fadeTween = TweenService:Create(guiObject, tweenInfo, fadeGoals)
-    fadeTween:Play()
-    
-    -- Also tween all children to fully transparent
-    for _, child in ipairs(guiObject:GetDescendants()) do
-        if child:IsA("GuiObject") then
-            local childGoals = {
-                BackgroundTransparency = 1
-            }
-            
-            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
-                childGoals.TextTransparency = 1
-                childGoals.TextStrokeTransparency = 1
-            end
-            
-            if child:IsA("ImageLabel") or child:IsA("ImageButton") then
-                childGoals.ImageTransparency = 1
-            end
-            
-            local childTween = TweenService:Create(child, tweenInfo, childGoals)
-            childTween:Play()
-        end
-    end
-    
-    -- Call callback when complete
-    if callback then
-        fadeTween.Completed:Connect(callback)
-    end
-    
-    return fadeTween
-end
-
--- Minimize frame animation
-function UIEffects.minimizeFrame(frame)
-    if not frame then return end
-    
-    local originalSize = frame.Size
-    local originalPos = frame.Position
-    local targetSize = UDim2.new(originalSize.X.Scale, originalSize.X.Offset, 0, 30)
-    
-    -- Calculate target position (keep the top in the same place)
-    local targetPos = UDim2.new(
-        originalPos.X.Scale,
-        originalPos.X.Offset,
-        originalPos.Y.Scale,
-        originalPos.Y.Offset
-    )
-    
-    -- Store original children visibility
-    local childrenStates = {}
-    for _, child in ipairs(frame:GetChildren()) do
-        if child:IsA("GuiObject") and child.Name ~= "TitleBar" then
-            childrenStates[child] = child.Visible
-            child.Visible = false
-        end
-    end
-    
-    -- Create minimize tween
-    local tweenInfo = TweenInfo.new(
-        0.5,
-        EASE_STYLES.InOut,
-        EASE_DIRECTIONS.InOut
-    )
-    
-    local minimizeGoals = {
-        Size = targetSize,
-        Position = targetPos
-    }
-    
-    local minimizeTween = TweenService:Create(frame, tweenInfo, minimizeGoals)
-    minimizeTween:Play()
-    
-    -- Set up expand function on title bar click
-    local titleBar = frame:FindFirstChild("TitleBar")
-    if titleBar then
-        -- Remove existing connections
-        local existingConnection = titleBar:GetAttribute("MinimizeConnection")
-        if existingConnection then
-            existingConnection:Disconnect()
-        end
-        
-        local connection
-        connection = titleBar.MouseButton1Click:Connect(function()
-            -- If we're minimized, expand
-            if frame.Size.Y.Offset <= 30 then
-                UIEffects.expandFrame(frame, originalSize, originalPos, childrenStates)
-                connection:Disconnect()
-            end
-        end)
-        
-        -- Store connection
-        titleBar:SetAttribute("MinimizeConnection", connection)
-    end
-    
-    return minimizeTween
-end
-
--- Expand frame animation
-function UIEffects.expandFrame(frame, originalSize, originalPos, childrenStates)
-    if not frame then return end
-    
-    -- Create expand tween
-    local tweenInfo = TweenInfo.new(
-        0.5,
-        EASE_STYLES.InOut,
-        EASE_DIRECTIONS.InOut
-    )
-    
-    local expandGoals = {
-        Size = originalSize,
-        Position = originalPos
-    }
-    
-    local expandTween = TweenService:Create(frame, tweenInfo, expandGoals)
-    expandTween:Play()
-    
-    -- Restore children visibility after tween
-    expandTween.Completed:Connect(function()
-        for child, wasVisible in pairs(childrenStates) do
-            if child and child.Parent then
-                child.Visible = wasVisible
-            end
-        end
-    end)
-    
-    return expandTween
-end
-
-------------------------------
--- SpeedBoost Module
-------------------------------
-local SpeedBoost = {}
-
--- Configuration
-local DEFAULT_SPEED_MULTIPLIER = 2
-local MAX_SPEED_MULTIPLIER = 3
-local BOOST_DURATION = 10 -- seconds
-local COOLDOWN_DURATION = 5 -- seconds
-
--- State variables
-local speedBoostIsActive = false
-local originalWalkSpeed = 16 -- Default Roblox walk speed
-local speedMultiplier = DEFAULT_SPEED_MULTIPLIER
-local speedBoostTimer = 0
-local speedCooldownTimer = 0
-local speedInCooldown = false
-local speedEffectParts = {}
-
--- Activate the speed boost
-function SpeedBoost.activate(player)
-    if speedBoostIsActive or speedInCooldown then
-        return false, "Speed boost is already active or in cooldown"
-    end
-    
-    -- Store original walk speed
-    local character = player.Character
-    if not character or not character:FindFirstChild("Humanoid") then
-        return false, "Character or Humanoid not found"
-    end
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    originalWalkSpeed = humanoid.WalkSpeed
-    
-    -- Apply speed boost
-    humanoid.WalkSpeed = originalWalkSpeed * speedMultiplier
-    
-    -- Create visual effect
-    createSpeedEffect(character)
-    
-    -- Set state
-    speedBoostIsActive = true
-    speedBoostTimer = BOOST_DURATION
-    
-    -- Connect update function
-    local connection
-    connection = RunService.Heartbeat:Connect(function(deltaTime)
-        speedBoostTimer = speedBoostTimer - deltaTime
-        
-        if speedBoostTimer <= 0 then
-            SpeedBoost.deactivate(player)
-            connection:Disconnect()
-            
-            -- Start cooldown
-            speedInCooldown = true
-            speedCooldownTimer = COOLDOWN_DURATION
-            
-            local cooldownConnection
-            cooldownConnection = RunService.Heartbeat:Connect(function(dt)
-                speedCooldownTimer = speedCooldownTimer - dt
-                if speedCooldownTimer <= 0 then
-                    speedInCooldown = false
-                    cooldownConnection:Disconnect()
-                end
-            end)
-        end
-    end)
-    
-    return true, "Speed boost activated"
-end
-
--- Deactivate the speed boost
-function SpeedBoost.deactivate(player)
-    if not speedBoostIsActive then
-        return false, "Speed boost is not active"
-    end
-    
-    local character = player.Character
-    if character and character:FindFirstChild("Humanoid") then
-        local humanoid = character:FindFirstChild("Humanoid")
-        humanoid.WalkSpeed = originalWalkSpeed
-    end
-    
-    -- Remove visual effects
-    removeSpeedEffect()
-    
-    speedBoostIsActive = false
-    return true, "Speed boost deactivated"
-end
-
--- Create visual speed effect
-function createSpeedEffect(character)
-    -- Clean up any existing effects
-    removeSpeedEffect()
-    
-    -- Create trail effect on feet
-    local rightLeg = character:FindFirstChild("RightLeg") or character:FindFirstChild("Right Leg")
-    local leftLeg = character:FindFirstChild("LeftLeg") or character:FindFirstChild("Left Leg")
-    
-    if rightLeg then
-        local trail = Instance.new("Trail")
-        trail.Color = ColorSequence.new(Color3.fromRGB(0, 150, 255))
-        trail.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        trail.Lifetime = 0.5
-        trail.MinLength = 0.1
-        trail.Attachment0 = createAttachment(rightLeg, "Top")
-        trail.Attachment1 = createAttachment(rightLeg, "Bottom")
-        trail.Parent = rightLeg
-        table.insert(speedEffectParts, trail)
-    end
-    
-    if leftLeg then
-        local trail = Instance.new("Trail")
-        trail.Color = ColorSequence.new(Color3.fromRGB(0, 150, 255))
-        trail.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        trail.Lifetime = 0.5
-        trail.MinLength = 0.1
-        trail.Attachment0 = createAttachment(leftLeg, "Top")
-        trail.Attachment1 = createAttachment(leftLeg, "Bottom")
-        trail.Parent = leftLeg
-        table.insert(speedEffectParts, trail)
-    end
-    
-    -- Add particle effect
-    local torso = character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
-    if torso then
-        local particleEmitter = Instance.new("ParticleEmitter")
-        particleEmitter.Color = ColorSequence.new(Color3.fromRGB(0, 150, 255))
-        particleEmitter.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.7),
-            NumberSequenceKeypoint.new(1, 1)
-        })
-        particleEmitter.Size = NumberSequence.new(0.5)
-        particleEmitter.Acceleration = Vector3.new(0, 0, 0)
-        particleEmitter.Lifetime = NumberRange.new(0.5, 1)
-        particleEmitter.Rate = 20
-        particleEmitter.Speed = NumberRange.new(3, 5)
-        particleEmitter.SpreadAngle = Vector2.new(25, 25)
-        particleEmitter.Parent = torso
-        table.insert(speedEffectParts, particleEmitter)
-    end
-end
-
--- Create attachment for trail effect
-function createAttachment(part, name)
-    local attachment = Instance.new("Attachment")
-    attachment.Name = name .. "Attachment"
-    
-    if name == "Top" then
-        attachment.Position = Vector3.new(0, part.Size.Y/2, 0)
-    else
-        attachment.Position = Vector3.new(0, -part.Size.Y/2, 0)
-    end
-    
-    attachment.Parent = part
-    table.insert(speedEffectParts, attachment)
-    return attachment
-end
-
--- Remove all visual effects
-function removeSpeedEffect()
-    for _, part in ipairs(speedEffectParts) do
-        pcall(function()
-            part:Destroy()
-        end)
-    end
-    speedEffectParts = {}
-end
-
--- Per-frame update function
-function SpeedBoost.update(deltaTime, player)
-    if speedBoostIsActive then
-        local character = player.Character
-        if character then
-            -- Optional: Add additional visual effects here
-        end
-    end
-end
-
-------------------------------
--- JumpBoost Module
-------------------------------
-local JumpBoost = {}
-
--- Configuration
-local DEFAULT_JUMP_MULTIPLIER = 2
-local MAX_JUMP_MULTIPLIER = 4
-local JUMP_BOOST_DURATION = 15 -- seconds
-local JUMP_COOLDOWN_DURATION = 10 -- seconds
-
--- State variables
-local jumpBoostIsActive = false
-local originalJumpPower = 50 -- Default Roblox jump power
-local jumpMultiplier = DEFAULT_JUMP_MULTIPLIER
-local jumpBoostTimer = 0
-local jumpCooldownTimer = 0
-local jumpInCooldown = false
-local jumpEffectParts = {}
-
--- Activate the jump boost
-function JumpBoost.activate(player)
-    if jumpBoostIsActive or jumpInCooldown then
-        return false, "Jump boost is already active or in cooldown"
-    end
-    
-    -- Store original jump power
-    local character = player.Character
-    if not character or not character:FindFirstChild("Humanoid") then
-        return false, "Character or Humanoid not found"
-    end
-    
-    local humanoid = character:FindFirstChild("Humanoid")
-    originalJumpPower = humanoid.JumpPower
-    
-    -- Apply jump boost
-    humanoid.JumpPower = originalJumpPower * jumpMultiplier
-    
-    -- Create visual effect
-    createJumpEffect(character)
-    
-    -- Set state
-    jumpBoostIsActive = true
-    jumpBoostTimer = JUMP_BOOST_DURATION
-    
-    -- Connect update function
-    local connection
-    connection = RunService.Heartbeat:Connect(function(deltaTime)
-        jumpBoostTimer = jumpBoostTimer - deltaTime
-        
-        if jumpBoostTimer <= 0 then
-            JumpBoost.deactivate(player)
-            connection:Disconnect()
-            
-            -- Start cooldown
-            jumpInCooldown = true
-            jumpCooldownTimer = JUMP_COOLDOWN_DURATION
-            
-            local cooldownConnection
-            cooldownConnection = RunService.Heartbeat:Connect(function(dt)
-                jumpCooldownTimer = jumpCooldownTimer - dt
-                if jumpCooldownTimer <= 0 then
-                    jumpInCooldown = false
-                    cooldownConnection:Disconnect()
-                end
-            end)
-        end
-    end)
-    
-    return true, "Jump boost activated"
-end
-
--- Deactivate the jump boost
-function JumpBoost.deactivate(player)
-    if not jumpBoostIsActive then
-        return false, "Jump boost is not active"
-    end
-    
-    local character = player.Character
-    if character and character:FindFirstChild("Humanoid") then
-        local humanoid = character:FindFirstChild("Humanoid")
-        humanoid.JumpPower = originalJumpPower
-    end
-    
-    -- Remove visual effects
-    removeJumpEffect()
-    
-    jumpBoostIsActive = false
-    return true, "Jump boost deactivated"
-end
-
--- Create visual jump effect
-function createJumpEffect(character)
-    -- Clean up any existing effects
-    removeJumpEffect()
-    
-    -- Create particles on feet
-    local rightFoot = character:FindFirstChild("RightFoot") or character:FindFirstChild("Right Foot")
-    local leftFoot = character:FindFirstChild("LeftFoot") or character:FindFirstChild("Left Foot")
-    
-    local function createFootParticle(part)
-        if part then
-            local particleEmitter = Instance.new("ParticleEmitter")
-            particleEmitter.Color = ColorSequence.new(Color3.fromRGB(0, 255, 100))
-            particleEmitter.Transparency = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 0.5),
-                NumberSequenceKeypoint.new(1, 1)
-            })
-            particleEmitter.Size = NumberSequence.new({
-                NumberSequenceKeypoint.new(0, 0.5),
-                NumberSequenceKeypoint.new(1, 0)
-            })
-            particleEmitter.Acceleration = Vector3.new(0, -10, 0)
-            particleEmitter.Lifetime = NumberRange.new(0.5, 1)
-            particleEmitter.Rate = 10
-            particleEmitter.Speed = NumberRange.new(2, 5)
-            particleEmitter.SpreadAngle = Vector2.new(35, 35)
-            particleEmitter.Parent = part
-            table.insert(jumpEffectParts, particleEmitter)
-        end
-    end
-    
-    createFootParticle(rightFoot)
-    createFootParticle(leftFoot)
-    
-    -- Create jump detector to emit burst on jump
-    local humanoid = character:FindFirstChild("Humanoid")
-    if humanoid then
-        local stateConnection
-        stateConnection = humanoid.StateChanged:Connect(function(oldState, newState)
-            if newState == Enum.HumanoidStateType.Jumping then
-                -- Create burst effect
-                local rootPart = character:FindFirstChild("HumanoidRootPart")
-                if rootPart then
-                    local burstEffect = Instance.new("ParticleEmitter")
-                    burstEffect.Color = ColorSequence.new(Color3.fromRGB(0, 255, 100))
-                    burstEffect.Transparency = NumberSequence.new({
-                        NumberSequenceKeypoint.new(0, 0.2),
-                        NumberSequenceKeypoint.new(1, 1)
-                    })
-                    burstEffect.Size = NumberSequence.new({
-                        NumberSequenceKeypoint.new(0, 1),
-                        NumberSequenceKeypoint.new(1, 3)
-                    })
-                    burstEffect.Lifetime = NumberRange.new(0.5, 1)
-                    burstEffect.Speed = NumberRange.new(5, 10)
-                    burstEffect.Acceleration = Vector3.new(0, -15, 0)
-                    burstEffect.SpreadAngle = Vector2.new(180, 180)
-                    burstEffect.EmissionDirection = Enum.NormalId.Bottom
-                    burstEffect.Rate = 0 -- Use Emit instead of continuous
-                    burstEffect.Parent = rootPart
-                    
-                    -- Emit a burst
-                    burstEffect:Emit(30)
-                    
-                    -- Remove after effect finishes
-                    delay(1, function()
-                        if burstEffect and burstEffect.Parent then
-                            burstEffect:Destroy()
-                        end
-                    end)
-                end
-            end
-        end)
-        
-        -- Store connection to disconnect later
-        table.insert(jumpEffectParts, {
-            disconnect = function()
-                stateConnection:Disconnect()
-            end
-        })
-    end
-end
-
--- Remove all visual effects
-function removeJumpEffect()
-    for _, part in ipairs(jumpEffectParts) do
-        pcall(function()
-            if typeof(part) == "table" and part.disconnect then
-                part.disconnect()
-            else
-                part:Destroy()
-            end
-        end)
-    end
-    jumpEffectParts = {}
-end
-
--- Per-frame update function
-function JumpBoost.update(deltaTime, player)
-    if jumpBoostIsActive then
-        local character = player.Character
-        if character then
-            -- Optional: Add additional visual effects here
-        end
-    end
-end
-
-------------------------------
--- WallHack Module
-------------------------------
-local WallHack = {}
-
--- Configuration
-local WALL_TRANSPARENCY = 0.7
-local HIGHLIGHT_COLOR = Color3.fromRGB(255, 150, 0)
-local ACTIVATION_DISTANCE = 30 -- only make walls transparent within this distance
-local REFRESH_RATE = 0.5 -- seconds between transparency updates
-
--- State variables
-local wallHackIsActive = false
-local affectedParts = {}
-local originalProperties = {}
-local wallUpdateTimer = 0
-
--- Activate the wall hack
-function WallHack.activate(player)
-    if wallHackIsActive then
-        return false, "Wall hack is already active"
-    end
-    
-    wallHackIsActive = true
-    updateWallTransparency(player)
-    
-    return true, "Wall hack activated"
-end
-
--- Deactivate the wall hack
-function WallHack.deactivate(player)
-    if not wallHackIsActive then
-        return false, "Wall hack is not active"
-    end
-    
-    -- Restore original properties
-    for part, properties in pairs(originalProperties) do
-        if part and part:IsA("BasePart") and part.Parent then
-            pcall(function()
-                part.Transparency = properties.Transparency
-                part.LocalTransparencyModifier = 0
-                
-                -- Remove highlight if it exists
-                local highlight = part:FindFirstChild("WallHackHighlight")
-                if highlight then
-                    highlight:Destroy()
-                end
-            end)
-        end
-    end
-    
-    -- Clear tables
-    affectedParts = {}
-    originalProperties = {}
-    
-    wallHackIsActive = false
-    return true, "Wall hack deactivated"
-end
-
--- Update wall transparency based on player position
-function updateWallTransparency(player)
-    -- Only proceed if active
-    if not wallHackIsActive then return end
-    
-    local character = player.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then
-        return
-    end
-    
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    local camera = Workspace.CurrentCamera
-    local playerPosition = rootPart.Position
-    
-    -- Reset previously affected parts
-    for part, _ in pairs(affectedParts) do
-        if part and part:IsA("BasePart") and part.Parent then
-            pcall(function()
-                -- Skip if the part is already being processed
-                if not originalProperties[part] then
-                    return
-                end
-                
-                part.Transparency = originalProperties[part].Transparency
-                part.LocalTransparencyModifier = 0
-                
-                -- Remove highlight if it exists
-                local highlight = part:FindFirstChild("WallHackHighlight")
-                if highlight then
-                    highlight:Destroy()
-                end
-            end)
-        end
-    end
-    
-    -- Clear the affected parts table for the new update
-    affectedParts = {}
-    
-    -- Get all walls/parts between player and camera
-    local function isObstructingPart(part)
-        -- Skip certain kinds of parts
-        if part:IsA("Terrain") or part.Name == "HumanoidRootPart" or part.Transparency > 0.9 then
-            return false
-        end
-        
-        -- Skip character parts
-        if part:IsDescendantOf(character) then
-            return false
-        end
-        
-        -- Skip tools/models that aren't "wall-like"
-        if part.Parent:FindFirstChild("Humanoid") or part.Parent.Parent:FindFirstChild("Humanoid") then
-            return false
-        end
-        
-        -- Only include parts within activation distance
-        if (part.Position - playerPosition).Magnitude > ACTIVATION_DISTANCE then
-            return false
-        end
-        
-        -- Check if the part is between player and camera
-        local cameraPosition = camera.CFrame.Position
-        local direction = (cameraPosition - playerPosition).Unit
-        local rayParams = RaycastParams.new()
-        rayParams.FilterDescendantsInstances = {character}
-        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-        
-        local raycastResult = Workspace:Raycast(playerPosition, direction * ACTIVATION_DISTANCE, rayParams)
-        
-        if raycastResult and raycastResult.Instance == part then
-            return true
-        end
-        
-        -- Also check if the part blocks the view to important game objects
-        local importantObjects = getImportantObjects()
-        for _, object in ipairs(importantObjects) do
-            if object and object:IsA("BasePart") then
-                local objectDirection = (object.Position - playerPosition).Unit
-                local rayResult = Workspace:Raycast(playerPosition, objectDirection * ACTIVATION_DISTANCE, rayParams)
-                
-                if rayResult and rayResult.Instance == part then
-                    return true
-                end
-            end
-        end
-        
-        return false
-    end
-    
-    -- Get parts in the player's surroundings
-    local parts = Workspace:GetPartBoundsInRadius(playerPosition, ACTIVATION_DISTANCE)
-    
-    for _, part in ipairs(parts) do
-        if isObstructingPart(part) then
-            -- Store original properties if not already stored
-            if not originalProperties[part] then
-                originalProperties[part] = {
-                    Transparency = part.Transparency
-                }
-            end
-            
-            -- Make the part semi-transparent
-            part.Transparency = math.max(part.Transparency, WALL_TRANSPARENCY)
-            part.LocalTransparencyModifier = WALL_TRANSPARENCY
-            
-            -- Add highlight effect
-            local highlight = part:FindFirstChild("WallHackHighlight")
-            if not highlight then
-                highlight = Instance.new("Highlight")
-                highlight.Name = "WallHackHighlight"
-                highlight.FillColor = HIGHLIGHT_COLOR
-                highlight.OutlineColor = HIGHLIGHT_COLOR
-                highlight.FillTransparency = 0.7
-                highlight.OutlineTransparency = 0.2
-                highlight.Parent = part
-            end
-            
-            -- Mark as affected
-            affectedParts[part] = true
-        end
-    end
-end
-
--- Get important game objects that should be visible through walls
-function getImportantObjects()
-    local objects = {}
-    
-    -- Add all other players
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            table.insert(objects, player.Character.HumanoidRootPart)
-        end
-    end
-    
-    -- Add game-specific objects (modify this for your specific game)
-    local collectibles = Workspace:FindFirstChild("Collectibles")
-    if collectibles then
-        for _, collectible in ipairs(collectibles:GetChildren()) do
-            if collectible:IsA("BasePart") then
-                table.insert(objects, collectible)
-            elseif collectible:FindFirstChildOfClass("BasePart") then
-                table.insert(objects, collectible:FindFirstChildOfClass("BasePart"))
-            end
-        end
-    end
-    
-    -- Add objectives or important locations
-    local objectives = Workspace:FindFirstChild("Objectives") or Workspace:FindFirstChild("GameObjects")
-    if objectives then
-        for _, objective in ipairs(objectives:GetChildren()) do
-            if objective:IsA("BasePart") then
-                table.insert(objects, objective)
-            elseif objective:FindFirstChildOfClass("BasePart") then
-                table.insert(objects, objective:FindFirstChildOfClass("BasePart"))
-            end
-        end
-    end
-    
-    return objects
-end
-
--- Per-frame update function
-function WallHack.update(deltaTime, player)
-    if wallHackIsActive then
-        wallUpdateTimer = wallUpdateTimer + deltaTime
-        
-        if wallUpdateTimer >= REFRESH_RATE then
-            wallUpdateTimer = 0
-            updateWallTransparency(player)
-        end
-    end
-end
-
-------------------------------
--- ESP Module
-------------------------------
-local ESP = {}
-
--- Configuration
-local PLAYER_COLOR = Color3.fromRGB(255, 0, 0)
-local FRIENDLY_COLOR = Color3.fromRGB(0, 255, 0)
-local ITEM_COLOR = Color3.fromRGB(255, 255, 0)
-local OBJECTIVE_COLOR = Color3.fromRGB(0, 150, 255)
-local UPDATE_INTERVAL = 0.1 -- seconds
-local MAX_DISPLAY_DISTANCE = 500 -- studs
-
--- State variables
-local espIsActive = false
-local espUpdateTimer = 0
-local espObjects = {}
-local highlightedObjects = {}
-
--- Activate ESP
-function ESP.activate(player)
-    if espIsActive then
-        return false, "ESP is already active"
-    end
-    
-    espIsActive = true
-    updateESP(player)
-    
-    return true, "ESP activated"
-end
-
--- Deactivate ESP
-function ESP.deactivate(player)
-    if not espIsActive then
-        return false, "ESP is not active"
-    end
-    
-    -- Remove all ESP elements
-    for object, espInfo in pairs(highlightedObjects) do
-        if espInfo.highlight and espInfo.highlight.Parent then
-            espInfo.highlight:Destroy()
-        end
-        
-        if espInfo.billboard and espInfo.billboard.Parent then
-            espInfo.billboard:Destroy()
-        end
-    end
-    
-    highlightedObjects = {}
-    espIsActive = false
-    
-    return true, "ESP deactivated"
-end
-
--- Update ESP highlights and billboards
-function updateESP(player)
-    -- Only proceed if active
-    if not espIsActive then return end
-    
-    local myCharacter = player.Character
-    local myTeam = player.Team
-    local myPosition = myCharacter and myCharacter:FindFirstChild("HumanoidRootPart") and
-                       myCharacter.HumanoidRootPart.Position
-    
-    if not myPosition then return end
-    
-    -- Identify objects to highlight
-    espObjects = {}
-    
-    -- Add players
-    for _, otherPlayer in ipairs(Players:GetPlayers()) do
-        if otherPlayer ~= player and otherPlayer.Character and
-           otherPlayer.Character:FindFirstChild("HumanoidRootPart") and
-           otherPlayer.Character:FindFirstChild("Humanoid") then
-            
-            local character = otherPlayer.Character
-            local position = character.HumanoidRootPart.Position
-            local distance = (position - myPosition).Magnitude
-            
-            if distance <= MAX_DISPLAY_DISTANCE then
-                local health = character.Humanoid.Health
-                local maxHealth = character.Humanoid.MaxHealth
-                local healthPercent = math.floor((health / maxHealth) * 100)
-                
-                -- Determine if friend or foe
-                local isFriendly = false
-                if Teams and #Teams:GetTeams() > 0 then
-                    isFriendly = otherPlayer.Team == myTeam
-                end
-                
-                table.insert(espObjects, {
-                    object = character,
-                    type = "player",
-                    color = isFriendly and FRIENDLY_COLOR or PLAYER_COLOR,
-                    text = otherPlayer.Name .. " [" .. healthPercent .. "%]",
-                    distance = distance
-                })
-            end
-        end
-    end
-    
-    -- Add collectible items
-    local collectibles = Workspace:FindFirstChild("Collectibles")
-    if collectibles then
-        for _, item in ipairs(collectibles:GetDescendants()) do
-            if item:IsA("BasePart") then
-                local position = item.Position
-                local distance = (position - myPosition).Magnitude
-                
-                if distance <= MAX_DISPLAY_DISTANCE then
-                    table.insert(espObjects, {
-                        object = item,
-                        type = "item",
-                        color = ITEM_COLOR,
-                        text = item.Name,
-                        distance = distance
-                    })
-                end
-            end
-        end
-    end
-    
-    -- Add objectives or important locations
-    local objectives = Workspace:FindFirstChild("Objectives") or 
-                      Workspace:FindFirstChild("GameObjects")
-    if objectives then
-        for _, objective in ipairs(objectives:GetDescendants()) do
-            if objective:IsA("BasePart") then
-                local position = objective.Position
-                local distance = (position - myPosition).Magnitude
-                
-                if distance <= MAX_DISPLAY_DISTANCE then
-                    table.insert(espObjects, {
-                        object = objective,
-                        type = "objective",
-                        color = OBJECTIVE_COLOR,
-                        text = objective.Name,
-                        distance = distance
-                    })
-                end
-            end
-        end
-    end
-    
-    -- Track objects that are no longer in the ESP list to remove them
-    local objectsToRemove = {}
-    for object, _ in pairs(highlightedObjects) do
-        local found = false
-        for _, espInfo in ipairs(espObjects) do
-            if espInfo.object == object then
-                found = true
-                break
-            end
-        end
-        
-        if not found then
-            objectsToRemove[object] = true
-        end
-    end
-    
-    -- Remove old objects
-    for object, _ in pairs(objectsToRemove) do
-        if highlightedObjects[object] then
-            if highlightedObjects[object].highlight then
-                highlightedObjects[object].highlight:Destroy()
-            end
-            
-            if highlightedObjects[object].billboard then
-                highlightedObjects[object].billboard:Destroy()
-            end
-            
-            highlightedObjects[object] = nil
-        end
-    end
-    
-    -- Update or create ESP elements for current objects
-    for _, espInfo in ipairs(espObjects) do
-        local object = espInfo.object
-        
-        -- Create or update highlight
-        if not highlightedObjects[object] then
-            highlightedObjects[object] = {}
-        end
-        
-        local highlight = highlightedObjects[object].highlight
-        if not highlight or not highlight.Parent then
-            highlight = Instance.new("Highlight")
-            highlight.FillColor = espInfo.color
-            highlight.OutlineColor = espInfo.color
-            highlight.FillTransparency = 0.5
-            highlight.OutlineTransparency = 0
-            highlight.Parent = object
-            highlightedObjects[object].highlight = highlight
-        else
-            highlight.FillColor = espInfo.color
-            highlight.OutlineColor = espInfo.color
-        end
-        
-        -- Create or update billboard
-        local billboard = highlightedObjects[object].billboard
-        if not billboard or not billboard.Parent then
-            billboard = Instance.new("BillboardGui")
-            billboard.Size = UDim2.new(0, 200, 0, 50)
-            billboard.StudsOffset = Vector3.new(0, 2, 0)
-            billboard.AlwaysOnTop = true
-            billboard.LightInfluence = 0
-            
-            local textLabel = Instance.new("TextLabel")
-            textLabel.Size = UDim2.new(1, 0, 1, 0)
-            textLabel.BackgroundTransparency = 1
-            textLabel.TextColor3 = espInfo.color
-            textLabel.TextStrokeTransparency = 0.5
-            textLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
-            textLabel.Font = Enum.Font.SourceSansBold
-            textLabel.TextScaled = true
-            textLabel.Parent = billboard
-            
-            billboard.Parent = object
-            highlightedObjects[object].billboard = billboard
-            highlightedObjects[object].textLabel = textLabel
-        end
-        
-        -- Update billboard text with distance
-        local distanceText = math.floor(espInfo.distance) .. "m"
-        highlightedObjects[object].textLabel.Text = espInfo.text .. " [" .. distanceText .. "]"
-    end
-end
-
--- Per-frame update function
-function ESP.update(deltaTime, player)
-    if espIsActive then
-        espUpdateTimer = espUpdateTimer + deltaTime
-        
-        if espUpdateTimer >= UPDATE_INTERVAL then
-            espUpdateTimer = 0
-            updateESP(player)
-        end
-    end
-end
-
-------------------------------
--- Teleport Module
-------------------------------
-local Teleport = {}
-
--- Configuration
-local TELEPORT_COOLDOWN = 5 -- seconds
-local MAX_CUSTOM_LOCATIONS = 5
-local ANIMATION_DURATION = 1 -- seconds
-
--- State variables
-local teleportIsActive = false
-local cooldownRemaining = 0
-local teleportInCooldown = false
-local customLocations = {}
-local presetLocations = {} -- Will be populated once the game's map is detected
-local teleportEffect = nil
-
--- Activate teleport feature
-function Teleport.activate(player)
-    if teleportIsActive then
-        return false, "Teleport feature is already active"
-    end
-    
-    -- Detect the game's map and add preset locations
-    detectGamePresets()
-    
-    teleportIsActive = true
-    return true, "Teleport feature activated"
-end
-
--- Deactivate teleport feature
-function Teleport.deactivate(player)
-    if not teleportIsActive then
-        return false, "Teleport feature is not active"
-    end
-    
-    teleportIsActive = false
-    
-    -- Clean up any teleport effects
-    if teleportEffect and teleportEffect.Parent then
-        teleportEffect:Destroy()
-        teleportEffect = nil
-    end
-    
-    return true, "Teleport feature deactivated"
-end
-
--- Add a custom location
-function Teleport.addCustomLocation(name, position)
-    if #customLocations >= MAX_CUSTOM_LOCATIONS then
-        return false, "Maximum number of custom locations reached"
-    end
-    
-    -- Check if name already exists
-    for _, location in ipairs(customLocations) do
-        if location.name == name then
-            return false, "Location with this name already exists"
-        end
-    end
-    
-    table.insert(customLocations, {
-        name = name,
-        position = position,
-        custom = true
-    })
-    
-    return true, "Custom location added: " .. name
-end
-
--- Save current position as a custom location
-function Teleport.saveCurrentLocation(player, name)
-    local character = player.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then
-        return false, "Character or HumanoidRootPart not found"
-    end
-    
-    local position = character.HumanoidRootPart.Position
-    return Teleport.addCustomLocation(name, position)
-end
-
--- Teleport to a location by name
-function Teleport.teleportToLocation(player, locationName)
-    if not teleportIsActive then
-        return false, "Teleport feature is not active"
-    end
-    
-    if teleportInCooldown then
-        return false, "Teleport is on cooldown for " .. math.ceil(cooldownRemaining) .. " seconds"
-    end
-    
-    local character = player.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") or not character:FindFirstChild("Humanoid") then
-        return false, "Character, HumanoidRootPart, or Humanoid not found"
-    end
-    
-    -- Find the location
-    local targetLocation = nil
-    
-    -- Check custom locations
-    for _, location in ipairs(customLocations) do
-        if location.name == locationName then
-            targetLocation = location
-            break
-        end
-    end
-    
-    -- Check preset locations if not found in custom
-    if not targetLocation then
-        for _, location in ipairs(presetLocations) do
-            if location.name == locationName then
-                targetLocation = location
-                break
-            end
-        end
-    end
-    
-    if not targetLocation then
-        return false, "Location not found: " .. locationName
-    end
-    
-    -- Start teleport animation and process
-    local humanoid = character.Humanoid
-    local rootPart = character.HumanoidRootPart
-    
-    -- Disable controls temporarily
-    humanoid.WalkSpeed = 0
-    
-    -- Create teleport effect
-    createTeleportEffect(character)
-    
-    -- Start the teleport animation
-    local startPos = rootPart.Position
-    local endPos = targetLocation.position
-    
-    local tweenInfo = TweenInfo.new(
-        ANIMATION_DURATION,
-        Enum.EasingStyle.Sine,
-        Enum.EasingDirection.InOut
-    )
-    
-    -- First, teleport slightly up to show "charging" effect
-    local upOffset = Vector3.new(0, 3, 0)
-    local upTween = TweenService:Create(rootPart, tweenInfo, {
-        CFrame = CFrame.new(startPos + upOffset)
-    })
-    
-    upTween:Play()
-    
-    upTween.Completed:Connect(function()
-        -- Then teleport to the target
-        rootPart.CFrame = CFrame.new(endPos + Vector3.new(0, 3, 0))
-        
-        -- Clean up effects
-        if teleportEffect and teleportEffect.Parent then
-            teleportEffect:Destroy()
-            teleportEffect = nil
-        end
-        
-        -- Create arrival effect
-        createArrivalEffect(character)
-        
-        -- Start cooldown
-        teleportInCooldown = true
-        cooldownRemaining = TELEPORT_COOLDOWN
-        
-        -- Enable controls again
-        humanoid.WalkSpeed = 16
-    end)
-    
-    return true, "Teleporting to " .. targetLocation.name
-end
-
--- Create teleport effect
-function createTeleportEffect(character)
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return end
-    
-    -- Clean up existing effect
-    if teleportEffect and teleportEffect.Parent then
-        teleportEffect:Destroy()
-    end
-    
-    -- Create effect
-    teleportEffect = Instance.new("ParticleEmitter")
-    teleportEffect.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 60, 255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(140, 140, 255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 60, 255))
-    })
-    teleportEffect.Size = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 1),
-        NumberSequenceKeypoint.new(0.5, 2),
-        NumberSequenceKeypoint.new(1, 1)
-    })
-    teleportEffect.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.2),
-        NumberSequenceKeypoint.new(1, 1)
-    })
-    teleportEffect.Speed = NumberRange.new(5, 10)
-    teleportEffect.Lifetime = NumberRange.new(0.5, 1)
-    teleportEffect.Rate = 50
-    teleportEffect.SpreadAngle = Vector2.new(180, 180)
-    teleportEffect.Parent = rootPart
-end
-
--- Create arrival effect
-function createArrivalEffect(character)
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return end
-    
-    local arrivalEffect = Instance.new("ParticleEmitter")
-    arrivalEffect.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 255, 180)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(140, 255, 200)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(30, 255, 180))
-    })
-    arrivalEffect.Size = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(0.2, 3),
-        NumberSequenceKeypoint.new(1, 0)
-    })
-    arrivalEffect.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0),
-        NumberSequenceKeypoint.new(0.8, 0.5),
-        NumberSequenceKeypoint.new(1, 1)
-    })
-    arrivalEffect.Speed = NumberRange.new(15, 25)
-    arrivalEffect.Acceleration = Vector3.new(0, -10, 0)
-    arrivalEffect.Lifetime = NumberRange.new(1, 2)
-    arrivalEffect.Rate = 0 -- Use emit instead of continuous
-    arrivalEffect.SpreadAngle = Vector2.new(180, 180)
-    arrivalEffect.Parent = rootPart
-    
-    -- Emit a burst then destroy
-    arrivalEffect:Emit(100)
-    
-    delay(2, function()
-        if arrivalEffect and arrivalEffect.Parent then
-            arrivalEffect:Destroy()
-        end
-    end)
-end
-
--- Detect the game's map and create preset locations
-function detectGamePresets()
-    -- Clear existing presets
-    presetLocations = {}
-    
-    -- Try to detect map type by looking for common elements
-    local mapName = "Unknown"
-    local detectedLocations = {}
-    
-    -- Look for spawn locations
-    local spawns = Workspace:FindFirstChild("Spawns") or Workspace:FindFirstChild("SpawnLocations")
-    if spawns then
-        for _, spawn in ipairs(spawns:GetChildren()) do
-            if spawn:IsA("BasePart") or spawn:IsA("SpawnLocation") then
-                table.insert(detectedLocations, {
-                    name = "Spawn_" .. spawn.Name,
-                    position = spawn.Position,
-                    custom = false
-                })
-            end
-        end
-    end
-    
-    -- Look for key locations in the map
-    local keyLocations = {
-        "Shop", "Store", "Base", "Hub", "Lobby", "Arena", "Stadium", 
-        "Center", "Treasure", "Chest", "Boss", "SafeZone"
-    }
-    
-    for _, locationName in ipairs(keyLocations) do
-        local location = Workspace:FindFirstChild(locationName)
-        if location then
-            if location:IsA("BasePart") then
-                table.insert(detectedLocations, {
-                    name = locationName,
-                    position = location.Position,
-                    custom = false
-                })
-            elseif location:FindFirstChildOfClass("BasePart") then
-                table.insert(detectedLocations, {
-                    name = locationName,
-                    position = location:FindFirstChildOfClass("BasePart").Position,
-                    custom = false
-                })
-            end
-        end
-    end
-    
-    -- If we found less than 3 preset locations, add some generic ones based on workspace structure
-    if #detectedLocations < 3 then
-        -- Find the highest point in the map
-        local highestY = -math.huge
-        local highestPos = Vector3.new(0, 0, 0)
-        
-        -- Find the center of the map
-        local mapCenter = Vector3.new(0, 0, 0)
-        local partCount = 0
-        
-        for _, child in ipairs(Workspace:GetDescendants()) do
-            if child:IsA("BasePart") and not child:IsDescendantOf(Players.LocalPlayer.Character) then
-                -- Check for highest point
-                if child.Position.Y > highestY then
-                    highestY = child.Position.Y
-                    highestPos = child.Position + Vector3.new(0, 5, 0)
-                end
-                
-                -- Add to center calculation
-                mapCenter = mapCenter + child.Position
-                partCount = partCount + 1
-            end
-        end
-        
-        if partCount > 0 then
-            mapCenter = mapCenter / partCount
-            
-            table.insert(detectedLocations, {
-                name = "Map Center",
-                position = mapCenter,
-                custom = false
-            })
-            
-            table.insert(detectedLocations, {
-                name = "Highest Point",
-                position = highestPos,
-                custom = false
-            })
-        end
-    end
-    
-    -- Add detected locations to our preset list
-    for _, location in ipairs(detectedLocations) do
-        table.insert(presetLocations, location)
-    end
-end
-
--- Get all available teleport locations
-function Teleport.getLocations()
-    local allLocations = {}
-    
-    -- Add preset locations
-    for _, location in ipairs(presetLocations) do
-        table.insert(allLocations, {
-            name = location.name,
-            isCustom = false
-        })
-    end
-    
-    -- Add custom locations
-    for _, location in ipairs(customLocations) do
-        table.insert(allLocations, {
-            name = location.name,
-            isCustom = true
-        })
-    end
-    
-    return allLocations
-end
-
--- Per-frame update function
-function Teleport.update(deltaTime, player)
-    if teleportIsActive and teleportInCooldown then
-        cooldownRemaining = cooldownRemaining - deltaTime
-        
-        if cooldownRemaining <= 0 then
-            teleportInCooldown = false
-            cooldownRemaining = 0
-        end
-    end
-end
-
-------------------------------
--- General Variables and State
-------------------------------
+local mouse = player:GetMouse()
+local camera = Workspace.CurrentCamera
 local guiCreated = false
-local screenGui = nil
-local mainFrame = nil
-local activeFeatures = {}
-local activePage = "Home"
-local statusClearTimeout = nil
+local guiVisible = false
+local activeTab = "Main"
 
--- Categories
+-- Hız ve karakter kontrolü
+local walkSpeed = 16
+local jumpPower = 50
+local infiniteJump = false
+local noclip = false
+local flying = false
+local flySpeed = 2
+local xray = false
+local esp = false
+local aimbotEnabled = false
+local aimbotTarget = nil
+local selectedPlayers = {}
+local selectedParts = {}
+
+-- GUI Renkleri
+local colors = {
+    background = Color3.fromRGB(30, 30, 35),
+    header = Color3.fromRGB(40, 40, 45),
+    button = Color3.fromRGB(50, 50, 60),
+    buttonHover = Color3.fromRGB(60, 60, 70),
+    buttonSelected = Color3.fromRGB(70, 90, 120),
+    text = Color3.fromRGB(240, 240, 240),
+    highlight = Color3.fromRGB(70, 130, 180),
+    warning = Color3.fromRGB(200, 60, 60),
+    success = Color3.fromRGB(60, 180, 75),
+    neutralLight = Color3.fromRGB(70, 70, 85),
+    neutralDark = Color3.fromRGB(50, 50, 65),
+    shadow = Color3.fromRGB(20, 20, 25),
+    categoryBG = Color3.fromRGB(35, 35, 45)
+}
+
+-- Tüm Komutlar
+local commands = {
+    -- Ana komutlar
+    {name = "Speed", desc = "Karakterin koşma hızını ayarla", category = "Character", func = function(speed) setWalkSpeed(tonumber(speed) or 16) end},
+    {name = "JumpPower", desc = "Karakterin zıplama gücünü ayarla", category = "Character", func = function(power) setJumpPower(tonumber(power) or 50) end},
+    {name = "InfiniteJump", desc = "Sınırsız zıplama", category = "Character", func = function() toggleInfiniteJump() end},
+    {name = "Fly", desc = "Uçma modunu aktifleştir", category = "Character", func = function() toggleFly() end},
+    {name = "Noclip", desc = "Duvarlardan geçme modunu aktifleştir", category = "Character", func = function() toggleNoclip() end},
+    {name = "XRay", desc = "Duvarları şeffaflaştır", category = "Vision", func = function() toggleXRay() end},
+    {name = "ESP", desc = "Oyuncuları ve nesneleri işaretle", category = "Vision", func = function() toggleESP() end},
+    {name = "Aimbot", desc = "Otomatik nişan alma", category = "Combat", func = function() toggleAimbot() end},
+    {name = "Teleport", desc = "Fare konumuna ışınlan", category = "Utility", func = function() teleportToMouse() end},
+    {name = "TpToPlayer", desc = "Belirli bir oyuncuya ışınlan", category = "Utility", func = function(playerName) teleportToPlayer(playerName) end},
+    {name = "Rejoin", desc = "Aynı sunucuya tekrar katıl", category = "Utility", func = function() rejoinServer() end},
+    {name = "NoFog", desc = "Sisi kaldır", category = "Vision", func = function() removeFog() end},
+    {name = "FullBright", desc = "Tam aydınlatma", category = "Vision", func = function() enableFullBright() end},
+    {name = "Invisible", desc = "Karakteri görünmez yap", category = "Character", func = function() makeInvisible() end},
+    {name = "RemoveMesh", desc = "Mesh'leri kaldır", category = "Character", func = function() removeMeshes() end},
+    
+    -- Combat komutları
+    {name = "KillAura", desc = "Yakınındaki oyuncuları otomatik vur", category = "Combat", func = function() toggleKillAura() end},
+    {name = "InfiniteAmmo", desc = "Sınırsız mermi", category = "Combat", func = function() giveInfiniteAmmo() end},
+    {name = "GodMode", desc = "Ölümsüzlük modunu dene", category = "Combat", func = function() attemptGodMode() end},
+    {name = "AutoFarm", desc = "Otomatik kaynak toplama", category = "Utility", func = function() toggleAutoFarm() end},
+    {name = "Reach", desc = "Silah menzilini artır", category = "Combat", func = function() increaseReach() end},
+    
+    -- Troll/Eğlence komutları
+    {name = "DanceAnimate", desc = "Dans animasyonu", category = "Fun", func = function() playDanceAnimation() end},
+    {name = "FakeChat", desc = "Başka bir oyuncu gibi mesaj", category = "Fun", func = function(name, message) fakeChatMessage(name, message) end},
+    {name = "GiantSize", desc = "Karakteri dev yap", category = "Fun", func = function() makeGiantSize() end},
+    {name = "TinySize", desc = "Karakteri küçült", category = "Fun", func = function() makeTinySize() end},
+    {name = "FloatingParts", desc = "Parçaları uçur", category = "Fun", func = function() createFloatingParts() end},
+    {name = "SpinCharacter", desc = "Karakteri döndür", category = "Fun", func = function() spinCharacter() end},
+    
+    -- Oyuncu komutları
+    {name = "Spectate", desc = "Bir oyuncuyu izle", category = "Players", func = function(playerName) spectatePlayer(playerName) end},
+    {name = "Unspectate", desc = "İzlemeyi durdur", category = "Players", func = function() unspectatePlayer() end},
+    {name = "Goto", desc = "Bir oyuncuya git", category = "Players", func = function(playerName) goToPlayer(playerName) end},
+    {name = "Bring", desc = "Bir oyuncuyu kendine getir (çoğu oyunda çalışmaz)", category = "Players", func = function(playerName) bringPlayer(playerName) end},
+    {name = "FlingPlayer", desc = "Bir oyuncuyu fırlat (çoğu oyunda çalışmaz)", category = "Players", func = function(playerName) flingPlayer(playerName) end},
+    
+    -- Araçlar
+    {name = "CopyPosition", desc = "Pozisyonu kopyala", category = "Utility", func = function() copyPosition() end},
+    {name = "BTools", desc = "İnşaat araçları ver", category = "Utility", func = function() giveBTools() end},
+    {name = "ForceField", desc = "Koruyucu kalkan", category = "Utility", func = function() applyForceField() end},
+    {name = "HighJump", desc = "Çok yükseğe zıpla", category = "Character", func = function() doHighJump() end},
+    {name = "SwimMode", desc = "Havada yüzme modu", category = "Character", func = function() toggleSwimMode() end},
+    
+    -- Görsel komutlar
+    {name = "Rainbow", desc = "Gökkuşağı karakter", category = "Visuals", func = function() makeRainbowCharacter() end},
+    {name = "ClearMap", desc = "Haritayı temizle", category = "Visuals", func = function() clearMap() end},
+    {name = "LowGraphics", desc = "Düşük grafik ayarları", category = "Visuals", func = function() setLowGraphics() end},
+    {name = "RemoveTextures", desc = "Dokuları kaldır", category = "Visuals", func = function() removeTextures() end},
+    {name = "ShowHitboxes", desc = "Vuruş kutularını göster", category = "Visuals", func = function() showHitboxes() end},
+}
+
+-- Kategoriler
 local categories = {
-    "Home",
-    "Movement",
+    "Main",
+    "Character",
+    "Combat",
     "Vision",
+    "Players",
     "Utility",
-    "Automation",
+    "Fun",
+    "Visuals",
     "Settings"
 }
 
--- Feature definitions
-local features = {
-    {
-        name = "Speed Boost",
-        description = "Increase your movement speed",
-        module = SpeedBoost,
-        icon = "SpeedIcon",
-        category = "Movement",
-        keyBind = "LeftShift"
-    },
-    {
-        name = "Jump Boost",
-        description = "Jump higher than normal",
-        module = JumpBoost,
-        icon = "JumpIcon",
-        category = "Movement",
-        keyBind = "Space"
-    },
-    {
-        name = "Wall Hack",
-        description = "See through walls",
-        module = WallHack,
-        icon = "WallIcon",
-        category = "Vision",
-        keyBind = "V"
-    },
-    {
-        name = "ESP",
-        description = "Highlight players and items",
-        module = ESP,
-        icon = "ESPIcon",
-        category = "Vision",
-        keyBind = "E"
-    },
-    {
-        name = "Teleport",
-        description = "Teleport to selected locations",
-        module = Teleport,
-        icon = "TeleportIcon",
-        category = "Utility",
-        keyBind = "T"
-    }
-}
+-- =====================
+-- Fonksiyon Tanımları
+-- =====================
 
-------------------------------
--- Helper Functions
-------------------------------
-
--- Set status bar text with auto-clear
-function setStatus(text)
-    if not mainFrame then return end
-    local statusBar = mainFrame:FindFirstChild("StatusBar")
-    if not statusBar then return end
-    local statusText = statusBar:FindFirstChild("StatusText")
-    if not statusText then return end
-    
-    statusText.Text = text
-    
-    -- Clear previous timeout if it exists
-    if statusClearTimeout then
-        pcall(function() 
-            statusClearTimeout:Disconnect()
-        end)
-    end
-    
-    -- Set new timeout to clear text after 5 seconds
-    statusClearTimeout = delay(5, function()
-        if statusText then
-            statusText.Text = "Ready"
-        end
-    end)
+-- Yürüme hızını ayarla
+function setWalkSpeed(speed)
+    if not player.Character or not player.Character:FindFirstChild("Humanoid") then return end
+    player.Character.Humanoid.WalkSpeed = speed
+    walkSpeed = speed
+    setStatus("Yürüme hızı " .. speed .. " olarak ayarlandı")
 end
 
--- Toggle a feature on/off
-function toggleFeature(featureName)
-    for _, feature in ipairs(features) do
-        if feature.name == featureName then
-            local isActive = not (activeFeatures[featureName] or false)
+-- Zıplama gücünü ayarla
+function setJumpPower(power)
+    if not player.Character or not player.Character:FindFirstChild("Humanoid") then return end
+    player.Character.Humanoid.JumpPower = power
+    jumpPower = power
+    setStatus("Zıplama gücü " .. power .. " olarak ayarlandı")
+end
+
+-- Sonsuz zıplama
+function toggleInfiniteJump()
+    infiniteJump = not infiniteJump
+    
+    if infiniteJump then
+        setStatus("Sonsuz zıplama aktif")
+    else
+        setStatus("Sonsuz zıplama deaktif")
+    end
+end
+
+-- Noclip (duvarlardan geçme)
+function toggleNoclip()
+    noclip = not noclip
+    
+    if noclip then
+        local noclipLoop = RunService.Stepped:Connect(function()
+            if not noclip then noclipLoop:Disconnect() return end
             
-            -- Try to activate/deactivate the feature
-            local success, result
-            
-            if isActive then
-                success, result = pcall(function()
-                    return feature.module.activate(player)
-                end)
-            else
-                success, result = pcall(function()
-                    return feature.module.deactivate(player)
-                end)
+            if player.Character then
+                for _, part in pairs(player.Character:GetDescendants()) do
+                    if part:IsA("BasePart") and part.CanCollide then
+                        part.CanCollide = false
+                    end
+                end
             end
+        end)
+        setStatus("Noclip aktif")
+    else
+        if player.Character then
+            for _, part in pairs(player.Character:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                    part.CanCollide = true
+                end
+            end
+        end
+        setStatus("Noclip deaktif")
+    end
+end
+
+-- Uçma modu
+function toggleFly()
+    flying = not flying
+    
+    if flying then
+        -- Uçma kodunu başlat
+        local flyPart = Instance.new("BodyVelocity")
+        flyPart.Velocity = Vector3.new(0, 0, 0)
+        flyPart.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        flyPart.Name = "FlyPart"
+        
+        -- Karakter hareketi
+        local controls = {
+            f = false,
+            b = false,
+            l = false,
+            r = false,
+            q = false,
+            e = false
+        }
+        
+        local controlsChanged = {}
+        
+        -- Klavye kontrolleri
+        controlsChanged.w = UserInputService.InputBegan:Connect(function(input)
+            if input.KeyCode == Enum.KeyCode.W then controls.f = true end
+            if input.KeyCode == Enum.KeyCode.S then controls.b = true end
+            if input.KeyCode == Enum.KeyCode.A then controls.l = true end
+            if input.KeyCode == Enum.KeyCode.D then controls.r = true end
+            if input.KeyCode == Enum.KeyCode.Q then controls.q = true end
+            if input.KeyCode == Enum.KeyCode.E then controls.e = true end
+        end)
+        
+        controlsChanged.s = UserInputService.InputEnded:Connect(function(input)
+            if input.KeyCode == Enum.KeyCode.W then controls.f = false end
+            if input.KeyCode == Enum.KeyCode.S then controls.b = false end
+            if input.KeyCode == Enum.KeyCode.A then controls.l = false end
+            if input.KeyCode == Enum.KeyCode.D then controls.r = false end
+            if input.KeyCode == Enum.KeyCode.Q then controls.q = false end
+            if input.KeyCode == Enum.KeyCode.E then controls.e = false end
+        end)
+        
+        local function fly()
+            if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
             
-            if success then
-                activeFeatures[featureName] = isActive
+            local rootPart = player.Character.HumanoidRootPart
+            local flyPartInstance = rootPart:FindFirstChild("FlyPart") or flyPart:Clone()
+            flyPartInstance.Parent = rootPart
+            
+            local flyLoop
+            flyLoop = RunService.Heartbeat:Connect(function()
+                if not flying then 
+                    flyLoop:Disconnect()
+                    if flyPartInstance and flyPartInstance.Parent then
+                        flyPartInstance:Destroy()
+                    end
+                    player.Character.Humanoid.PlatformStand = false
+                    return 
+                end
                 
-                -- Find and update the feature button
-                for _, categoryName in ipairs(categories) do
-                    local categoryPage = mainFrame:FindFirstChild("Content"):FindFirstChild(categoryName.."Page")
-                    if categoryPage then
-                        local featureButton = categoryPage:FindFirstChild(featureName.."Button")
-                        if featureButton then
-                            if isActive then
-                                featureButton.BackgroundColor3 = Color3.fromRGB(60, 200, 60)
-                                setStatus(featureName .. " activated!")
-                            else
-                                featureButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-                                setStatus(featureName .. " deactivated")
+                player.Character.Humanoid.PlatformStand = true
+                
+                local direction = Vector3.new(0, 0, 0)
+                
+                -- Kamera yönüne göre hareket
+                local lookVector = camera.CFrame.LookVector
+                local rightVector = camera.CFrame.RightVector
+                
+                if controls.f then
+                    direction = direction + lookVector
+                end
+                if controls.b then
+                    direction = direction - lookVector
+                end
+                if controls.r then
+                    direction = direction + rightVector
+                end
+                if controls.l then
+                    direction = direction - rightVector
+                end
+                if controls.q then
+                    direction = direction + Vector3.new(0, 1, 0)
+                end
+                if controls.e then
+                    direction = direction + Vector3.new(0, -1, 0)
+                end
+                
+                if direction.Magnitude > 0 then
+                    direction = direction.Unit
+                end
+                
+                flyPartInstance.Velocity = direction * flySpeed * 50
+            end)
+        end
+        
+        fly()
+        setStatus("Uçma modu aktif - WASDQE tuşlarını kullan")
+    else
+        -- Uçma modunu kapat
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local flyPartInstance = player.Character.HumanoidRootPart:FindFirstChild("FlyPart")
+            if flyPartInstance then
+                flyPartInstance:Destroy()
+            end
+        end
+        
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.PlatformStand = false
+        end
+        
+        setStatus("Uçma modu deaktif")
+    end
+end
+
+-- X-Ray (duvarları görme)
+function toggleXRay()
+    xray = not xray
+    
+    if xray then
+        -- Duvarların şeffaflığını ayarla
+        for _, part in ipairs(Workspace:GetDescendants()) do
+            if part:IsA("BasePart") and not part:IsDescendantOf(player.Character) and part.Transparency < 0.8 and not part:IsA("Terrain") then
+                if not part:FindFirstChild("OriginalTransparency") then
+                    local originalValue = Instance.new("NumberValue")
+                    originalValue.Name = "OriginalTransparency"
+                    originalValue.Value = part.Transparency
+                    originalValue.Parent = part
+                end
+                part.Transparency = 0.8
+            end
+        end
+        setStatus("X-Ray aktif")
+    else
+        -- Duvarların şeffaflığını geri al
+        for _, part in ipairs(Workspace:GetDescendants()) do
+            if part:IsA("BasePart") and part:FindFirstChild("OriginalTransparency") then
+                part.Transparency = part.OriginalTransparency.Value
+                part.OriginalTransparency:Destroy()
+            end
+        end
+        setStatus("X-Ray deaktif")
+    end
+end
+
+-- ESP (oyuncuları ve nesneleri görme)
+function toggleESP()
+    esp = not esp
+    
+    if esp then
+        -- ESP kodunu başlat
+        local espLoop
+        espLoop = RunService.RenderStepped:Connect(function()
+            if not esp then 
+                espLoop:Disconnect()
+                -- Mevcut ESP öğelerini temizle
+                for _, player in ipairs(Players:GetPlayers()) do
+                    if player.Character then
+                        for _, part in ipairs(player.Character:GetDescendants()) do
+                            if part:IsA("BoxHandleAdornment") and part.Name == "ESPBox" then
+                                part:Destroy()
                             end
                         end
                     end
                 end
-                
-                -- Update home page if it's active
-                if activePage == "Home" then
-                    updateHomePageStats()
-                end
-            else
-                warn("Error toggling feature " .. featureName .. ": " .. tostring(result))
-                setStatus("Error: Could not toggle " .. featureName)
+                return 
             end
             
+            -- Diğer oyuncular için ESP uygula
+            for _, otherPlayer in ipairs(Players:GetPlayers()) do
+                if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") and otherPlayer.Character:FindFirstChild("Humanoid") then
+                    -- Zaten ESP kutusu var mı kontrol et
+                    local hasESP = false
+                    for _, part in ipairs(otherPlayer.Character:GetDescendants()) do
+                        if part:IsA("BoxHandleAdornment") and part.Name == "ESPBox" then
+                            hasESP = true
+                            break
+                        end
+                    end
+                    
+                    if not hasESP then
+                        -- Her oyuncu için ESP kutusu ekle
+                        for _, part in ipairs(otherPlayer.Character:GetDescendants()) do
+                            if part:IsA("BasePart") then
+                                local box = Instance.new("BoxHandleAdornment")
+                                box.Name = "ESPBox"
+                                box.Adornee = part
+                                box.AlwaysOnTop = true
+                                box.ZIndex = 10
+                                box.Size = part.Size
+                                box.Transparency = 0.5
+                                
+                                -- Takım renkleri
+                                if otherPlayer.Team and player.Team then
+                                    if otherPlayer.Team == player.Team then
+                                        box.Color3 = Color3.fromRGB(0, 255, 0) -- Yeşil (takım arkadaşı)
+                                    else
+                                        box.Color3 = Color3.fromRGB(255, 0, 0) -- Kırmızı (düşman)
+                                    end
+                                else
+                                    box.Color3 = Color3.fromRGB(255, 170, 0) -- Turuncu (nötr)
+                                end
+                                
+                                box.Parent = part
+                            end
+                        end
+                        
+                        -- Bilgi etiketini ekle
+                        local billboardGui = Instance.new("BillboardGui")
+                        billboardGui.Name = "ESPTag"
+                        billboardGui.Adornee = otherPlayer.Character.Head
+                        billboardGui.Size = UDim2.new(0, 100, 0, 40)
+                        billboardGui.StudsOffset = Vector3.new(0, 2, 0)
+                        billboardGui.AlwaysOnTop = true
+                        
+                        local nameLabel = Instance.new("TextLabel")
+                        nameLabel.BackgroundTransparency = 1
+                        nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+                        nameLabel.Font = Enum.Font.GothamSemibold
+                        nameLabel.TextSize = 14
+                        nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                        nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                        nameLabel.TextStrokeTransparency = 0.3
+                        nameLabel.Text = otherPlayer.Name
+                        nameLabel.Parent = billboardGui
+                        
+                        local distanceLabel = Instance.new("TextLabel")
+                        distanceLabel.BackgroundTransparency = 1
+                        distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
+                        distanceLabel.Position = UDim2.new(0, 0, 0.5, 0)
+                        distanceLabel.Font = Enum.Font.Gotham
+                        distanceLabel.TextSize = 12
+                        distanceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                        distanceLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                        distanceLabel.TextStrokeTransparency = 0.3
+                        distanceLabel.Parent = billboardGui
+                        
+                        billboardGui.Parent = otherPlayer.Character.Head
+                        
+                        -- Mesafe bilgisini güncelle
+                        local updateDistanceLoop
+                        updateDistanceLoop = RunService.Heartbeat:Connect(function()
+                            if otherPlayer.Character and player.Character and 
+                               otherPlayer.Character:FindFirstChild("HumanoidRootPart") and
+                               player.Character:FindFirstChild("HumanoidRootPart") then
+                                
+                                local distance = (otherPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                                distanceLabel.Text = string.format("%.0f studs", distance)
+                            else
+                                updateDistanceLoop:Disconnect()
+                            end
+                        end)
+                    end
+                end
+            end
+        end)
+        setStatus("ESP aktif")
+    else
+        -- ESP kodunu devre dışı bırak, öğeleri temizle
+        for _, plyr in ipairs(Players:GetPlayers()) do
+            if plyr.Character then
+                for _, part in ipairs(plyr.Character:GetDescendants()) do
+                    if (part:IsA("BoxHandleAdornment") and part.Name == "ESPBox") or 
+                       (part:IsA("BillboardGui") and part.Name == "ESPTag") then
+                        part:Destroy()
+                    end
+                end
+            end
+        end
+        setStatus("ESP deaktif")
+    end
+end
+
+-- Aimbot (otomatik nişan alma)
+function toggleAimbot()
+    aimbotEnabled = not aimbotEnabled
+    
+    if aimbotEnabled then
+        local aimbotLoop
+        aimbotLoop = RunService.RenderStepped:Connect(function()
+            if not aimbotEnabled then 
+                aimbotLoop:Disconnect()
+                return 
+            end
+            
+            local closestPlayer = nil
+            local shortestDistance = math.huge
+            
+            -- En yakın oyuncuyu bul
+            for _, otherPlayer in ipairs(Players:GetPlayers()) do
+                if otherPlayer ~= player and otherPlayer.Character and
+                   otherPlayer.Character:FindFirstChild("Humanoid") and
+                   otherPlayer.Character.Humanoid.Health > 0 and
+                   otherPlayer.Character:FindFirstChild("HumanoidRootPart") and
+                   otherPlayer.Character:FindFirstChild("Head") then
+                    
+                    -- Ekranda göründüğünü kontrol et
+                    local head = otherPlayer.Character.Head
+                    local headPosition = head.Position
+                    local screenPoint = camera:WorldToScreenPoint(headPosition)
+                    
+                    if screenPoint.Z > 0 then
+                        local vector = Vector2.new(screenPoint.X - mouse.X, screenPoint.Y - mouse.Y)
+                        local distance = vector.Magnitude
+                        
+                        -- Ekranın merkezine en yakın oyuncuyu seç
+                        if distance < shortestDistance then
+                            shortestDistance = distance
+                            closestPlayer = otherPlayer
+                        end
+                    end
+                end
+            end
+            
+            -- En yakın oyuncuya bak
+            if closestPlayer and shortestDistance < 300 then
+                aimbotTarget = closestPlayer
+                camera.CFrame = CFrame.new(camera.CFrame.Position, closestPlayer.Character.Head.Position)
+            else
+                aimbotTarget = nil
+            end
+        end)
+        setStatus("Aimbot aktif")
+    else
+        aimbotTarget = nil
+        setStatus("Aimbot deaktif")
+    end
+end
+
+-- Fare konumuna ışınlanma
+function teleportToMouse()
+    local mousePos = mouse.Hit.Position
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.CFrame = CFrame.new(mousePos + Vector3.new(0, 5, 0))
+        setStatus("Fare konumuna ışınlandın")
+    else
+        setStatus("Işınlanma başarısız: Karakter bulunamadı")
+    end
+end
+
+-- Oyuncuya ışınlanma
+function teleportToPlayer(targetName)
+    local targetPlayer = nil
+    
+    for _, plyr in ipairs(Players:GetPlayers()) do
+        if plyr.Name:lower():find(targetName:lower()) then
+            targetPlayer = plyr
             break
         end
     end
-end
-
--- Switch between pages
-function switchPage(pageName)
-    activePage = pageName
     
-    -- Update navigation button states
-    for _, category in ipairs(categories) do
-        local button = mainFrame:FindFirstChild("Navigation"):FindFirstChild(category.."Button")
-        if button then
-            if category == pageName then
-                button.BackgroundColor3 = Color3.fromRGB(60, 120, 255)
-                button.TextColor3 = Color3.fromRGB(255, 255, 255)
-            else
-                button.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-                button.TextColor3 = Color3.fromRGB(200, 200, 200)
-            end
-        end
-    end
-    
-    -- Clear content frame
-    local contentFrame = mainFrame:FindFirstChild("Content")
-    for _, child in pairs(contentFrame:GetChildren()) do
-        if child:IsA("Frame") or child:IsA("ScrollingFrame") then
-            child.Visible = false
-        end
-    end
-    
-    -- Show appropriate content
-    local pageFrame = contentFrame:FindFirstChild(pageName.."Page")
-    if pageFrame then
-        pageFrame.Visible = true
-        
-        -- If home page, update feature status
-        if pageName == "Home" then
-            updateHomePageStats()
-        end
-    end
-    
-    setStatus("Switched to " .. pageName .. " page")
-end
-
--- Update home page statistics and active features
-function updateHomePageStats()
-    local homePage = mainFrame:FindFirstChild("Content"):FindFirstChild("HomePage")
-    if homePage then
-        local activeCount = 0
-        
-        -- Update active features
-        for _, feature in ipairs(features) do
-            if activeFeatures[feature.name] then
-                activeCount = activeCount + 1
-            end
-        end
-        
-        -- Update stats
-        local statsFrame = homePage:FindFirstChild("StatsFrame")
-        if statsFrame then
-            local activeFeatures = statsFrame:FindFirstChild("ActiveFeatures")
-            if activeFeatures then
-                activeFeatures.Text = "Active Features: " .. activeCount .. "/" .. #features
-            end
-        end
-    end
-end
-
--- Toggle GUI visibility
-function toggleGui()
-    if not mainFrame then return end
-    
-    local isGuiVisible = mainFrame.Visible
-    isGuiVisible = not isGuiVisible
-    
-    if isGuiVisible then
-        mainFrame.Visible = true
-        UIEffects.fadeIn(mainFrame)
+    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") and
+       player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        player.Character.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 2)
+        setStatus(targetPlayer.Name .. " adlı oyuncuya ışınlandın")
     else
-        UIEffects.fadeOut(mainFrame, function()
-            mainFrame.Visible = false
-        end)
+        setStatus("Oyuncu bulunamadı veya ışınlanılamadı")
     end
 end
 
-------------------------------
--- Create GUI Elements
-------------------------------
-function createGui()
-    if guiCreated then return end
+-- Sunucuya yeniden bağlan
+function rejoinServer()
+    setStatus("Sunucuya yeniden bağlanılıyor...")
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId)
+end
+
+-- Sisi kaldır
+function removeFog()
+    Lighting.FogStart = 100000
+    Lighting.FogEnd = 100000
+    setStatus("Sis kaldırıldı")
+end
+
+-- Tam aydınlatma
+function enableFullBright()
+    local oldAmbient = Lighting.Ambient
+    Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+    Lighting.Brightness = 2
+    Lighting.ClockTime = 14
+    Lighting.FogEnd = 100000
+    Lighting.GlobalShadows = false
+    Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
     
-    -- Create ScreenGui
-    screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "CheatGUI"
-    screenGui.ResetOnSpawn = false
-    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    setStatus("Tam aydınlatma etkinleştirildi")
+end
+
+-- Görünmezlik
+function makeInvisible()
+    if player.Character then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Decal") and part.Name ~= "HumanoidRootPart" then
+                part.Transparency = 1
+            end
+        end
+        setStatus("Görünmezlik etkinleştirildi (yarı-görünmezlik)")
+    end
+end
+
+-- Meshes'leri kaldır
+function removeMeshes()
+    if player.Character then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("SpecialMesh") or part:IsA("Mesh") or part:IsA("MeshPart") then
+                part:Destroy()
+            end
+        end
+        setStatus("Mesh'ler kaldırıldı")
+    end
+end
+
+-- KillAura
+function toggleKillAura()
+    local killAuraEnabled = not (getgenv().KillAuraConnection ~= nil)
     
-    -- Create main frame
-    mainFrame = Instance.new("Frame")
-    mainFrame.Name = "MainFrame"
-    mainFrame.Size = UDim2.new(0, 600, 0, 350)
-    mainFrame.Position = UDim2.new(0.5, -300, 0.5, -175)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-    mainFrame.BorderSizePixel = 0
-    mainFrame.ClipsDescendants = true
-    mainFrame.Visible = false
+    if killAuraEnabled then
+        local range = 15 -- Vuruş menzili
+        
+        -- KillAura döngüsü
+        getgenv().KillAuraConnection = RunService.Heartbeat:Connect(function()
+            for _, otherPlayer in ipairs(Players:GetPlayers()) do
+                if otherPlayer ~= player and otherPlayer.Character and player.Character and
+                   otherPlayer.Character:FindFirstChild("Humanoid") and
+                   otherPlayer.Character.Humanoid.Health > 0 and
+                   otherPlayer.Character:FindFirstChild("HumanoidRootPart") and
+                   player.Character:FindFirstChild("HumanoidRootPart") then
+                    
+                    local distance = (otherPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                    
+                    if distance <= range then
+                        -- Silahı bul ve ateş et veya kılıcı bul ve vur
+                        for _, tool in pairs(player.Character:GetChildren()) do
+                            if tool:IsA("Tool") and (tool:FindFirstChild("Handle") or tool:FindFirstChild("Blade")) then
+                                -- Remote event'i etkinleştir (oyunlar arasında değişebilir)
+                                local handlePart = tool:FindFirstChild("Handle") or tool:FindFirstChild("Blade")
+                                
+                                -- Yakındaki oyuncuya farklı yöntemlerle vurmayı dene 
+                                -- (Not: Bu her oyunda çalışmayabilir)
+                                
+                                -- Yöntem 1: Doğrudan vurma
+                                if tool.Name:lower():find("sword") or tool.Name:lower():find("knife") then
+                                    tool:Activate()
+                                    -- Vuruş için silahı hedefle
+                                    handlePart.CFrame = otherPlayer.Character.HumanoidRootPart.CFrame
+                                end
+                                
+                                -- Yöntem 2: Remote event kullanma
+                                for _, event in pairs(tool:GetDescendants()) do
+                                    if event:IsA("RemoteEvent") and (event.Name:lower():find("hit") or event.Name:lower():find("damage")) then
+                                        event:FireServer(otherPlayer.Character.HumanoidRootPart)
+                                    end
+                                end
+                                
+                                -- Yöntem 3: Serverside olayını taklit etme
+                                for _, event in pairs(ReplicatedStorage:GetDescendants()) do
+                                    if event:IsA("RemoteEvent") and (event.Name:lower():find("damage") or event.Name:lower():find("hit")) then
+                                        event:FireServer(otherPlayer.Character.HumanoidRootPart)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        
+        setStatus("KillAura aktif - 15 birim menzilli")
+    else
+        if getgenv().KillAuraConnection then
+            getgenv().KillAuraConnection:Disconnect()
+            getgenv().KillAuraConnection = nil
+        end
+        
+        setStatus("KillAura deaktif")
+    end
+end
+
+-- Sonsuz mermi
+function giveInfiniteAmmo()
+    local gunHook
+    gunHook = hookmetamethod(game, "__namecall", function(self, ...)
+        local args = {...}
+        local method = getnamecallmethod()
+        
+        if method == "FireServer" and self.Name:lower():find("ammo") or self.Name:lower():find("bullet") then
+            -- Mermi sayısı hook'u
+            return
+        end
+        
+        return gunHook(self, ...)
+    end)
     
-    -- Add corner radius
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = mainFrame
+    setStatus("Sonsuz mermi aktifleştirildi (bazı oyunlarda çalışmayabilir)")
+end
+
+-- God Mode (ölümsüzlük modu)
+function attemptGodMode()
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        -- Yöntem 1: Humanoid verilerini kopyala
+        local humanoid = player.Character.Humanoid
+        local cloneHum = humanoid:Clone()
+        humanoid.Name = "1"
+        cloneHum.Parent = player.Character
+        humanoid:Destroy()
+        cloneHum.Name = "Humanoid"
+        
+        -- Yöntem 2: BreakJoints ataklarını engelle
+        player.Character.Humanoid.BreakJointsOnDeath = false
+        
+        -- Yöntem 3: Health degerini koru
+        local healthHook
+        healthHook = hookmetamethod(game, "__index", function(self, key)
+            if self == player.Character.Humanoid and key == "Health" then
+                return 100
+            end
+            return healthHook(self, key)
+        end)
+        
+        setStatus("God Mode aktifleştirilmeye çalışıldı (bazı oyunlarda çalışmayabilir)")
+    end
+end
+
+-- Otomatik Kaynak Toplama
+function toggleAutoFarm()
+    local autoFarmEnabled = not (getgenv().AutoFarmConnection ~= nil)
     
-    -- Create title bar
-    local titleBar = Instance.new("Frame")
-    titleBar.Name = "TitleBar"
-    titleBar.Size = UDim2.new(1, 0, 0, 30)
-    titleBar.Position = UDim2.new(0, 0, 0, 0)
-    titleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-    titleBar.BorderSizePixel = 0
+    if autoFarmEnabled then
+        -- Ortak kaynak isimlerini belirle
+        local resourceNames = {
+            "Coin", "Gem", "Diamond", "Cash", "Money", "Gold", "Silver", "Bronze",
+            "Chest", "Crate", "Box", "Ore", "Resource", "Collectible", "Pickup",
+            "XP", "Exp", "Experience", "Points", "Token"
+        }
+        
+        getgenv().AutoFarmConnection = RunService.Heartbeat:Connect(function()
+            if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+                return
+            end
+            
+            local rootPart = player.Character.HumanoidRootPart
+            local closestResource = nil
+            local shortestDistance = 50 -- Maksimum mesafe
+            
+            -- İlk olarak workspace'de arama yap
+            for _, child in ipairs(workspace:GetDescendants()) do
+                if child:IsA("BasePart") or child:IsA("Model") then
+                    local isResource = false
+                    
+                    -- İsim kontrolü
+                    for _, resourceName in ipairs(resourceNames) do
+                        if child.Name:lower():find(resourceName:lower()) or 
+                           (child.Parent and child.Parent.Name:lower():find(resourceName:lower())) then
+                            isResource = true
+                            break
+                        end
+                    end
+                    
+                    -- Fiziksel özellik kontrolü (pırıltı, dönme hareketi, vb.)
+                    if not isResource and child:IsA("BasePart") then
+                        if child:FindFirstChildOfClass("ParticleEmitter") or
+                           child:FindFirstChildOfClass("PointLight") or
+                           child:FindFirstChildOfClass("Sparkles") then
+                            isResource = true
+                        end
+                        
+                        -- Renge göre de kontrol edebiliriz
+                        if not isResource and (
+                            child.BrickColor == BrickColor.new("Bright yellow") or -- Altın/Para rengi
+                            child.BrickColor == BrickColor.new("Bright blue") or   -- Değerli taş rengi
+                            child.BrickColor == BrickColor.new("New Yeller")       -- Para rengi
+                        ) then
+                            isResource = true
+                        end
+                    end
+                    
+                    if isResource then
+                        local targetPosition = child:IsA("Model") and child:GetModelCFrame().Position or child.Position
+                        local distance = (targetPosition - rootPart.Position).Magnitude
+                        
+                        if distance < shortestDistance then
+                            shortestDistance = distance
+                            closestResource = child
+                        end
+                    end
+                end
+            end
+            
+            -- Eğer bir kaynak bulunduysa otomatik topla
+            if closestResource then
+                local targetPosition = closestResource:IsA("Model") and closestResource:GetModelCFrame().Position or closestResource.Position
+                
+                -- Kaynağa doğru hareket et
+                player.Character.Humanoid:MoveTo(targetPosition)
+                
+                -- Çok yakınsa direk üzerine ışınlan (daha hızlı toplama için)
+                if shortestDistance < 10 then
+                    rootPart.CFrame = CFrame.new(targetPosition)
+                end
+                
+                -- Kaynağın üzerine bas (remoteEvents ile etkileşimde bulun)
+                -- Touch interest sistemini tetikle
+                firetouchinterest(rootPart, closestResource, 0)
+                wait(0.1)
+                firetouchinterest(rootPart, closestResource, 1)
+                
+                -- RemoteEvent'ler üzerinde deneme yap
+                for _, event in pairs(closestResource:GetDescendants()) do
+                    if event:IsA("RemoteEvent") and (event.Name:lower():find("collect") or event.Name:lower():find("pickup") or event.Name:lower():find("grab")) then
+                        event:FireServer()
+                    end
+                end
+            end
+        end)
+        
+        setStatus("Otomatik kaynak toplama aktif")
+    else
+        if getgenv().AutoFarmConnection then
+            getgenv().AutoFarmConnection:Disconnect()
+            getgenv().AutoFarmConnection = nil
+        end
+        
+        setStatus("Otomatik kaynak toplama devre dışı")
+    end
+end
+
+-- Silah menzilini artır
+function increaseReach()
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local args = {...}
+        local method = getnamecallmethod()
+        
+        if method == "FireServer" and string.find(self.Name:lower(), "hit") or string.find(self.Name:lower(), "damage") then
+            -- Argümanları kontrol et ve gerekirse değiştir
+            for i, v in pairs(args) do
+                if typeof(v) == "Vector3" then
+                    -- Menzili arttır
+                    args[i] = player.Character.HumanoidRootPart.Position + (v - player.Character.HumanoidRootPart.Position).unit * 30
+                end
+                
+                if typeof(v) == "Instance" and v:IsA("BasePart") then
+                    -- En yakın oyuncuyu bul
+                    local closestPlayer = nil
+                    local shortestDistance = 20 -- Artırılmış menzil
+                    
+                    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+                        if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                            local distance = (otherPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                            
+                            if distance < shortestDistance then
+                                shortestDistance = distance
+                                closestPlayer = otherPlayer
+                            end
+                        end
+                    end
+                    
+                    if closestPlayer then
+                        args[i] = closestPlayer.Character.HumanoidRootPart
+                    end
+                end
+            end
+            
+            return oldNamecall(self, unpack(args))
+        end
+        
+        return oldNamecall(self, ...)
+    end)
+    
+    setStatus("Silah menzili artırıldı (bazı oyunlarda çalışmayabilir)")
+end
+
+-- Dans animasyonu oynat
+function playDanceAnimation()
+    local animations = {
+        "rbxassetid://507771019", -- Shuffle
+        "rbxassetid://429703734", -- Moonwalk
+        "rbxassetid://35654637",  -- Thriller
+        "rbxassetid://129423030", -- Breakdance
+        "rbxassetid://3189773368" -- Floss
+    }
+    
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        local animationIndex = math.random(1, #animations)
+        local anim = Instance.new("Animation")
+        anim.AnimationId = animations[animationIndex]
+        
+        local animTrack = player.Character.Humanoid:LoadAnimation(anim)
+        animTrack:Play()
+        
+        setStatus("Dans animasyonu oynatılıyor")
+    end
+end
+
+-- Sahte sohbet mesajı
+function fakeChatMessage(targetName, message)
+    local targetPlayer = nil
+    
+    for _, plyr in ipairs(Players:GetPlayers()) do
+        if plyr.Name:lower():find(targetName:lower()) then
+            targetPlayer = plyr
+            break
+        end
+    end
+    
+    if not targetPlayer then
+        setStatus("Oyuncu bulunamadı")
+        return
+    end
+    
+    -- Chat geçmişi arayüzünü bul
+    local chatGui = nil
+    
+    for _, gui in ipairs(player.PlayerGui:GetChildren()) do
+        if gui.Name:lower():find("chat") then
+            chatGui = gui
+            break
+        end
+    end
+    
+    if not chatGui then
+        setStatus("Sohbet arayüzü bulunamadı")
+        return
+    end
+    
+    -- Sahte mesaj oluştur
+    local fakeMessageFrame = Instance.new("Frame")
+    fakeMessageFrame.Size = UDim2.new(1, 0, 0, 20)
+    fakeMessageFrame.BackgroundTransparency = 1
+    
+    local fakeMessageText = Instance.new("TextLabel")
+    fakeMessageText.Size = UDim2.new(1, 0, 1, 0)
+    fakeMessageText.BackgroundTransparency = 1
+    fakeMessageText.Font = Enum.Font.SourceSans
+    fakeMessageText.TextSize = 16
+    fakeMessageText.TextXAlignment = Enum.TextXAlignment.Left
+    fakeMessageText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    
+    -- Takım renklerine göre ayarla
+    if targetPlayer.Team then
+        fakeMessageText.TextColor3 = targetPlayer.TeamColor.Color
+    end
+    
+    fakeMessageText.Text = targetPlayer.Name .. ": " .. message
+    fakeMessageText.Parent = fakeMessageFrame
+    
+    -- Mesajı chat geçmişine ekle
+    for _, child in ipairs(chatGui:GetDescendants()) do
+        if child:IsA("ScrollingFrame") and child.Name:lower():find("chat") or child.Name:lower():find("message") then
+            fakeMessageFrame.Parent = child
+            break
+        end
+    end
+    
+    setStatus("Sahte mesaj gönderildi")
+    
+    -- Bir süre sonra mesajı kaldır
+    delay(10, function()
+        fakeMessageFrame:Destroy()
+    end)
+end
+
+-- Dev karakter yap
+function makeGiantSize()
+    if player.Character then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Size = part.Size * 3
+            end
+        end
+        
+        if player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.HipHeight = player.Character.Humanoid.HipHeight * 3
+        end
+        
+        setStatus("Karakter büyütüldü")
+    end
+end
+
+-- Küçük karakter yap
+function makeTinySize()
+    if player.Character then
+        for _, part in pairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Size = part.Size * 0.5
+            end
+        end
+        
+        if player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.HipHeight = player.Character.Humanoid.HipHeight * 0.5
+        end
+        
+        setStatus("Karakter küçültüldü")
+    end
+end
+
+-- Uçan parçalar oluştur
+function createFloatingParts()
+    local parts = {}
+    local colors = {
+        Color3.fromRGB(255, 0, 0),
+        Color3.fromRGB(0, 255, 0),
+        Color3.fromRGB(0, 0, 255),
+        Color3.fromRGB(255, 255, 0),
+        Color3.fromRGB(0, 255, 255),
+        Color3.fromRGB(255, 0, 255)
+    }
+    
+    -- 20 parça oluştur
+    for i = 1, 20 do
+        local part = Instance.new("Part")
+        part.Size = Vector3.new(1, 1, 1)
+        part.Anchored = true
+        part.CanCollide = false
+        part.BrickColor = BrickColor.new(colors[math.random(1, #colors)])
+        part.Material = Enum.Material.Neon
+        part.Shape = Enum.PartType.Ball
+        part.Parent = workspace
+        
+        table.insert(parts, part)
+    end
+    
+    -- Parçaları oyuncunun etrafında döndür
+    local angle = 0
+    local radius = 5
+    local angleStep = math.pi * 2 / #parts
+    local floatingLoop
+    
+    floatingLoop = RunService.Heartbeat:Connect(function()
+        if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+            -- Oyuncu karakteri kaybolursa parçaları temizle
+            for _, part in ipairs(parts) do
+                part:Destroy()
+            end
+            floatingLoop:Disconnect()
+            return
+        end
+        
+        angle = angle + 0.03
+        
+        for i, part in ipairs(parts) do
+            local x = math.cos(angle + i * angleStep) * radius
+            local y = math.sin(angle * 0.5) * 2 + 4
+            local z = math.sin(angle + i * angleStep) * radius
+            
+            part.Position = player.Character.HumanoidRootPart.Position + Vector3.new(x, y, z)
+        end
+    end)
+    
+    -- 30 saniye sonra parçaları temizle
+    delay(30, function()
+        floatingLoop:Disconnect()
+        for _, part in ipairs(parts) do
+            part:Destroy()
+        end
+    end)
+    
+    setStatus("Uçan parçalar oluşturuldu (30 saniye)")
+end
+
+-- Karakteri döndür
+function spinCharacter()
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local spinSpeed = 10 -- dönüş hızı
+        local isSpinning = true
+        
+        local spinLoop
+        spinLoop = RunService.Heartbeat:Connect(function()
+            if not isSpinning or not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+                spinLoop:Disconnect()
+                return
+            end
+            
+            player.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(spinSpeed), 0)
+        end)
+        
+        -- 10 saniye sonra dönmeyi durdur
+        delay(10, function()
+            isSpinning = false
+            setStatus("Döndürme durduruldu")
+        end)
+        
+        setStatus("Karakter döndürülüyor (10 saniye)")
+    end
+end
+
+-- Bir oyuncuyu izle
+function spectatePlayer(targetName)
+    local targetPlayer = nil
+    
+    for _, plyr in ipairs(Players:GetPlayers()) do
+        if plyr.Name:lower():find(targetName:lower()) then
+            targetPlayer = plyr
+            break
+        end
+    end
+    
+    if targetPlayer and targetPlayer.Character then
+        workspace.CurrentCamera.CameraSubject = targetPlayer.Character.Humanoid
+        setStatus(targetPlayer.Name .. " adlı oyuncu izleniyor")
+    else
+        setStatus("Oyuncu bulunamadı")
+    end
+end
+
+-- İzlemeyi durdur
+function unspectatePlayer()
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        workspace.CurrentCamera.CameraSubject = player.Character.Humanoid
+        setStatus("İzleme modu kapatıldı")
+    end
+end
+
+-- Oyuncuya git
+function goToPlayer(targetName)
+    teleportToPlayer(targetName) -- Aynı fonksiyonu kullan
+end
+
+-- Oyuncuyu kendine getir
+function bringPlayer(targetName)
+    local targetPlayer = nil
+    
+    for _, plyr in ipairs(Players:GetPlayers()) do
+        if plyr.Name:lower():find(targetName:lower()) then
+            targetPlayer = plyr
+            break
+        end
+    end
+    
+    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") and
+       player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        
+        -- Not: Bu fonksiyon çoğu oyunda çalışmaz - oyunlar arası koruma vardır
+        
+        -- Yöntem 1: Pozisyonu değiştirmeyi dene
+        targetPlayer.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+        
+        -- Yöntem 2: Uzaktan etkilemeyi dene
+        if targetPlayer.Character:FindFirstChildOfClass("Tool") then
+            local tool = targetPlayer.Character:FindFirstChildOfClass("Tool")
+            local handle = tool:FindFirstChild("Handle")
+            
+            if handle then
+                handle.CFrame = player.Character.HumanoidRootPart.CFrame
+            end
+        end
+        
+        setStatus("Oyuncuyu getirme denendi (çoğu oyunda çalışmaz)")
+    else
+        setStatus("Oyuncu bulunamadı veya getirilemedi")
+    end
+end
+
+-- Oyuncuyu fırlat
+function flingPlayer(targetName)
+    local targetPlayer = nil
+    
+    for _, plyr in ipairs(Players:GetPlayers()) do
+        if plyr.Name:lower():find(targetName:lower()) then
+            targetPlayer = plyr
+            break
+        end
+    end
+    
+    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") and
+       player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        
+        -- Not: Bu fonksiyon çoğu oyunda çalışmaz - oyunlar arası koruma vardır
+        
+        -- Konumu sakla
+        local oldPos = player.Character.HumanoidRootPart.CFrame
+        
+        -- Karakter hızını artır
+        player.Character.Humanoid.WalkSpeed = 100
+        
+        -- Hedef oyuncuya doğru koş
+        player.Character.Humanoid:MoveTo(targetPlayer.Character.HumanoidRootPart.Position)
+        
+        -- Çarpma etkisini artır
+        local bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bodyVelocity.P = math.huge
+        bodyVelocity.Parent = player.Character.HumanoidRootPart
+        
+        -- Bekle ve çarpışmadan hemen sonra çarpışmayı artır
+        delay(0.5, function()
+            bodyVelocity.Velocity = player.Character.HumanoidRootPart.CFrame.LookVector * 500
+            bodyVelocity.Parent = targetPlayer.Character.HumanoidRootPart
+            
+            -- 1 saniye sonra temizle ve eski konuma dön
+            delay(1, function()
+                bodyVelocity:Destroy()
+                player.Character.HumanoidRootPart.CFrame = oldPos
+                player.Character.Humanoid.WalkSpeed = 16
+            end)
+        end)
+        
+        setStatus("Oyuncuyu fırlatma denendi (çoğu oyunda çalışmaz)")
+    else
+        setStatus("Oyuncu bulunamadı veya fırlatılamadı")
+    end
+end
+
+-- Pozisyonu kopyala
+function copyPosition()
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local position = player.Character.HumanoidRootPart.Position
+        local posText = "Vector3.new(" .. tostring(position.X) .. ", " .. tostring(position.Y) .. ", " .. tostring(position.Z) .. ")"
+        
+        setclipboard(posText)
+        setStatus("Pozisyon kopyalandı: " .. posText)
+    else
+        setStatus("Pozisyon kopyalanamadı")
+    end
+end
+
+-- BTools ver
+function giveBTools()
+    local toolNames = {"Move", "Clone", "Delete", "Grab"}
+    
+    for _, toolName in ipairs(toolNames) do
+        local tool = Instance.new("HopperBin")
+        tool.Name = toolName
+        tool.BinType = Enum.BinType[toolName]
+        tool.Parent = player.Backpack
+    end
+    
+    setStatus("BTools verildi")
+end
+
+-- Koruyucu kalkan
+function applyForceField()
+    if player.Character then
+        local forceField = Instance.new("ForceField")
+        forceField.Parent = player.Character
+        
+        setStatus("Koruyucu kalkan etkinleştirildi")
+    end
+end
+
+-- Yüksek zıplama
+function doHighJump()
+    if player.Character and player.Character:FindFirstChild("Humanoid") and player.Character:FindFirstChild("HumanoidRootPart") then
+        local jumpForce = 100
+        
+        -- Yerden zıpladığını kontrol et
+        local isOnGround = player.Character.Humanoid:GetState() == Enum.HumanoidStateType.Running or
+                           player.Character.Humanoid:GetState() == Enum.HumanoidStateType.RunningNoPhysics
+        
+        if isOnGround then
+            -- Yukarı doğru güç uygulamak için BodyVelocity kullan
+            local bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.Velocity = Vector3.new(0, jumpForce, 0)
+            bodyVelocity.MaxForce = Vector3.new(0, math.huge, 0)
+            bodyVelocity.Parent = player.Character.HumanoidRootPart
+            
+            -- 0.2 saniye sonra temizle
+            delay(0.2, function()
+                bodyVelocity:Destroy()
+            end)
+            
+            setStatus("Yüksek zıplama gerçekleştirildi")
+        else
+            setStatus("Zıplama için yerde olmalısın")
+        end
+    end
+end
+
+-- Havada yüzme modu
+function toggleSwimMode()
+    local swimModeEnabled = not (getgenv().SwimModeConnection ~= nil)
+    
+    if swimModeEnabled then
+        getgenv().SwimModeConnection = RunService.Heartbeat:Connect(function()
+            if player.Character and player.Character:FindFirstChild("Humanoid") then
+                -- Humanoid state'i yüzme olarak ayarla
+                player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Swimming)
+                
+                -- WASD tuşlarıyla 3 boyutlu hareket
+                local moveDirection = player.Character.Humanoid.MoveDirection
+                
+                if moveDirection.Magnitude > 0 then
+                    player.Character.HumanoidRootPart.Velocity = camera.CFrame:VectorToWorldSpace(Vector3.new(
+                        moveDirection.X * 30,
+                        moveDirection.Y * 30,
+                        moveDirection.Z * 30
+                    ))
+                else
+                    player.Character.HumanoidRootPart.Velocity = Vector3.new(0, 0, 0)
+                end
+            end
+        end)
+        
+        setStatus("Havada yüzme modu aktif")
+    else
+        if getgenv().SwimModeConnection then
+            getgenv().SwimModeConnection:Disconnect()
+            getgenv().SwimModeConnection = nil
+        end
+        
+        -- Karakterin normal durumuna dön
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+        end
+        
+        setStatus("Havada yüzme modu devre dışı")
+    end
+end
+
+-- Gökkuşağı karakter
+function makeRainbowCharacter()
+    if player.Character then
+        local rainbowSpeed = 2
+        local hue = 0
+        
+        local rainbowLoop
+        rainbowLoop = RunService.Heartbeat:Connect(function()
+            if not player.Character then
+                rainbowLoop:Disconnect()
+                return
+            end
+            
+            hue = (hue + rainbowSpeed) % 360
+            local color = Color3.fromHSV(hue/360, 1, 1)
+            
+            for _, part in ipairs(player.Character:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                    part.Color = color
+                end
+            end
+        end)
+        
+        -- 30 saniye sonra devre dışı bırak
+        delay(30, function()
+            rainbowLoop:Disconnect()
+            setStatus("Gökkuşağı efekti sonlandırıldı")
+        end)
+        
+        setStatus("Gökkuşağı karakter efekti uygulandı (30 saniye)")
+    end
+end
+
+-- Haritayı temizle (zararlı olabilir!)
+function clearMap()
+    -- Oyuncu ve oyun mekanikleri güvenliği için neleri koruyacağımızı belirle
+    local protectedNames = {
+        "Workspace", "Camera", "Terrain", "SpawnLocation", "Players", "Script", "LocalScript", "StarterPack",
+        "StarterGui", "StarterPlayer", "TouchTransmitter"
+    }
+    
+    local function isProtected(obj)
+        for _, name in ipairs(protectedNames) do
+            if obj.Name:find(name) or obj:IsA(name) or obj:IsDescendantOf(Players) then
+                return true
+            end
+        end
+        return false
+    end
+    
+    local removedCount = 0
+    local maxRemove = 100 -- Oyunu çökertmemek için güvenlik sınırı
+    
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if not isProtected(obj) and obj:IsA("BasePart") and obj.Anchored then
+            obj.Transparency = 1
+            obj.CanCollide = false
+            removedCount = removedCount + 1
+            
+            if removedCount >= maxRemove then
+                break
+            end
+        end
+    end
+    
+    setStatus("Haritadaki " .. removedCount .. " öğe gizlendi (şeffaf yapıldı)")
+end
+
+-- Düşük grafik ayarları
+function setLowGraphics()
+    -- Grafik kalitesini düşür
+    settings().Rendering.QualityLevel = 1
+    
+    -- Shadows, efektler ve parçacıkları kapat
+    game:GetService("Lighting").GlobalShadows = false
+    game:GetService("Lighting").ShadowSoftness = 0
+    
+    -- FPS sınırını kaldır
+    setfpscap(9999)
+    
+    -- Görüş mesafesini azalt
+    settings().Rendering.EagerBulkExecution = false
+    
+    -- Eşyaları daha basitleştir
+    for _, part in ipairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.Material = Enum.Material.SmoothPlastic
+            
+            -- Özel efektleri kaldır
+            for _, child in ipairs(part:GetChildren()) do
+                if child:IsA("ParticleEmitter") or child:IsA("Trail") or child:IsA("Smoke") or child:IsA("Fire") then
+                    child.Enabled = false
+                end
+            end
+        end
+    end
+    
+    setStatus("Düşük grafik ayarları uygulandı")
+end
+
+-- Dokuları kaldır
+function removeTextures()
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            obj.Material = Enum.Material.SmoothPlastic
+            
+            -- Decal, Texture ve diğer görsel öğeleri kaldır
+            for _, child in ipairs(obj:GetChildren()) do
+                if child:IsA("Decal") or child:IsA("Texture") then
+                    child.Transparency = 1
+                end
+            end
+        end
+    end
+    
+    setStatus("Dokular kaldırıldı")
+end
+
+-- Vuruş kutularını göster
+function showHitboxes()
+    local hitboxesEnabled = not (getgenv().HitboxConnection ~= nil)
+    
+    if hitboxesEnabled then
+        local hitboxes = {}
+        
+        -- Diğer oyuncular için hitbox oluştur
+        for _, otherPlayer in ipairs(Players:GetPlayers()) do
+            if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                for _, part in ipairs(otherPlayer.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        local hitbox = Instance.new("BoxHandleAdornment")
+                        hitbox.Name = "Hitbox"
+                        hitbox.Adornee = part
+                        hitbox.Color3 = Color3.fromRGB(255, 0, 0)
+                        hitbox.Transparency = 0.7
+                        hitbox.AlwaysOnTop = true
+                        hitbox.ZIndex = 10
+                        hitbox.Size = part.Size
+                        hitbox.Parent = part
+                        
+                        table.insert(hitboxes, hitbox)
+                    end
+                end
+            end
+        end
+        
+        -- Güncelleme döngüsü oluştur
+        getgenv().HitboxConnection = RunService.Heartbeat:Connect(function()
+            for _, otherPlayer in ipairs(Players:GetPlayers()) do
+                if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    -- Karakter parçalarındaki hitbox'ları kontrol et
+                    for _, part in ipairs(otherPlayer.Character:GetDescendants()) do
+                        if part:IsA("BasePart") and not part:FindFirstChild("Hitbox") then
+                            local hitbox = Instance.new("BoxHandleAdornment")
+                            hitbox.Name = "Hitbox"
+                            hitbox.Adornee = part
+                            hitbox.Color3 = Color3.fromRGB(255, 0, 0)
+                            hitbox.Transparency = 0.7
+                            hitbox.AlwaysOnTop = true
+                            hitbox.ZIndex = 10
+                            hitbox.Size = part.Size
+                            hitbox.Parent = part
+                            
+                            table.insert(hitboxes, hitbox)
+                        end
+                    end
+                end
+            end
+        end)
+        
+        setStatus("Vuruş kutuları gösteriliyor")
+    else
+        if getgenv().HitboxConnection then
+            getgenv().HitboxConnection:Disconnect()
+            getgenv().HitboxConnection = nil
+        end
+        
+        -- Tüm hitbox'ları temizle
+        for _, plyr in ipairs(Players:GetPlayers()) do
+            if plyr.Character then
+                for _, part in ipairs(plyr.Character:GetDescendants()) do
+                    if part:IsA("BoxHandleAdornment") and part.Name == "Hitbox" then
+                        part:Destroy()
+                    end
+                end
+            end
+        end
+        
+        setStatus("Vuruş kutuları gizlendi")
+    end
+end
+
+-- =====================
+-- GUI Oluşturma
+-- =====================
+
+-- Status metni gösterme
+local statusLabel = nil
+function setStatus(text)
+    if not statusLabel then return end
+    statusLabel.Text = text
+    
+    delay(5, function()
+        -- 5 saniye sonra metni sıfırla
+        if statusLabel and statusLabel.Text == text then
+            statusLabel.Text = "Hazır"
+        end
+    end)
+end
+
+-- Key doğrulama GUI'si
+function createKeyVerificationGUI()
+    -- CoreGui kullanma denemesi yap (bazı executor'lar izin vermez)
+    local container = nil
+    pcall(function()
+        container = game:GetService("CoreGui")
+    end)
+    
+    if not container then
+        container = player.PlayerGui
+    end
+    
+    -- Ana GUI oluştur
+    local keyGUI = Instance.new("ScreenGui")
+    keyGUI.Name = "KilasikKeyVerification"
+    keyGUI.ResetOnSpawn = false
+    keyGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    keyGUI.Parent = container
+    
+    -- Arkaplan
+    local background = Instance.new("Frame")
+    background.Size = UDim2.new(0, 350, 0, 200)
+    background.Position = UDim2.new(0.5, -175, 0.5, -100)
+    background.BackgroundColor3 = colors.background
+    background.BorderSizePixel = 0
+    background.Parent = keyGUI
+    
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = UDim.new(0, 10)
+    uiCorner.Parent = background
+    
+    -- Başlık
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, 0, 0, 40)
+    title.BackgroundColor3 = colors.header
+    title.BorderSizePixel = 0
+    title.Text = "KİLASİK GUI - Key Doğrulama"
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 18
+    title.TextColor3 = colors.text
+    title.Parent = background
     
     local titleCorner = Instance.new("UICorner")
-    titleCorner.CornerRadius = UDim.new(0, 6)
+    titleCorner.CornerRadius = UDim.new(0, 10)
+    titleCorner.Parent = title
+    
+    local titleCoverBar = Instance.new("Frame")
+    titleCoverBar.Size = UDim2.new(1, 0, 0, 10)
+    titleCoverBar.Position = UDim2.new(0, 0, 1, -10)
+    titleCoverBar.BackgroundColor3 = colors.header
+    titleCoverBar.BorderSizePixel = 0
+    titleCoverBar.ZIndex = 0
+    titleCoverBar.Parent = title
+    
+    -- Açıklama
+    local description = Instance.new("TextLabel")
+    description.Size = UDim2.new(1, -40, 0, 40)
+    description.Position = UDim2.new(0, 20, 0, 50)
+    description.BackgroundTransparency = 1
+    description.Text = "Bu GUI'yi kullanmak için geçerli bir key girmeniz gerekiyor."
+    description.Font = Enum.Font.Gotham
+    description.TextSize = 14
+    description.TextWrapped = true
+    description.TextColor3 = colors.text
+    description.Parent = background
+    
+    -- Input kutusu
+    local inputBox = Instance.new("TextBox")
+    inputBox.Size = UDim2.new(1, -40, 0, 35)
+    inputBox.Position = UDim2.new(0, 20, 0, 95)
+    inputBox.BackgroundColor3 = colors.neutralDark
+    inputBox.PlaceholderText = "Key'i buraya girin..."
+    inputBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+    inputBox.Text = ""
+    inputBox.Font = Enum.Font.Gotham
+    inputBox.TextSize = 14
+    inputBox.TextColor3 = colors.text
+    inputBox.BorderSizePixel = 0
+    inputBox.ClearTextOnFocus = false
+    inputBox.Parent = background
+    
+    local inputBoxCorner = Instance.new("UICorner")
+    inputBoxCorner.CornerRadius = UDim.new(0, 6)
+    inputBoxCorner.Parent = inputBox
+    
+    -- Doğrulama butonu
+    local verifyButton = Instance.new("TextButton")
+    verifyButton.Size = UDim2.new(0, 150, 0, 35)
+    verifyButton.Position = UDim2.new(0.5, -75, 0, 145)
+    verifyButton.BackgroundColor3 = colors.highlight
+    verifyButton.Text = "Doğrula"
+    verifyButton.Font = Enum.Font.GothamBold
+    verifyButton.TextSize = 16
+    verifyButton.TextColor3 = colors.text
+    verifyButton.BorderSizePixel = 0
+    verifyButton.AutoButtonColor = false
+    verifyButton.Parent = background
+    
+    local verifyButtonCorner = Instance.new("UICorner")
+    verifyButtonCorner.CornerRadius = UDim.new(0, 6)
+    verifyButtonCorner.Parent = verifyButton
+    
+    -- Sonuç etiketi
+    local resultLabel = Instance.new("TextLabel")
+    resultLabel.Size = UDim2.new(1, -40, 0, 20)
+    resultLabel.Position = UDim2.new(0, 20, 0, 185)
+    resultLabel.BackgroundTransparency = 1
+    resultLabel.Text = ""
+    resultLabel.Font = Enum.Font.Gotham
+    resultLabel.TextSize = 14
+    resultLabel.TextColor3 = colors.warning
+    resultLabel.Parent = background
+    
+    -- Buton hover efekti
+    verifyButton.MouseEnter:Connect(function()
+        verifyButton.BackgroundColor3 = Color3.fromRGB(90, 150, 200)
+    end)
+    
+    verifyButton.MouseLeave:Connect(function()
+        verifyButton.BackgroundColor3 = colors.highlight
+    end)
+    
+    -- Key doğrulama fonksiyonu
+    verifyButton.MouseButton1Click:Connect(function()
+        local inputKey = inputBox.Text
+        
+        if inputKey == KEY_CODE then
+            resultLabel.Text = "Key doğrulandı! GUI yükleniyor..."
+            resultLabel.TextColor3 = colors.success
+            
+            keyVerified = true
+            
+            -- GUI'yi yükle
+            delay(1, function()
+                keyGUI:Destroy()
+                createMainGUI()
+            end)
+        else
+            resultLabel.Text = "Geçersiz key! Lütfen tekrar deneyin."
+            resultLabel.TextColor3 = colors.warning
+            
+            -- Hata efekti
+            local originalColor = inputBox.BackgroundColor3
+            inputBox.BackgroundColor3 = colors.warning
+            delay(0.5, function()
+                inputBox.BackgroundColor3 = originalColor
+            end)
+        end
+    end)
+    
+    return keyGUI
+end
+
+-- Ana GUI'yi oluştur
+function createMainGUI()
+    if guiCreated then return end
+    
+    -- CoreGui kullanma denemesi yap (bazı executor'lar izin vermez)
+    local container = nil
+    pcall(function()
+        container = game:GetService("CoreGui")
+    end)
+    
+    if not container then
+        container = player.PlayerGui
+    end
+    
+    -- Ana GUI oluştur
+    local mainGUI = Instance.new("ScreenGui")
+    mainGUI.Name = "KilasikGUI"
+    mainGUI.ResetOnSpawn = false
+    mainGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    mainGUI.Parent = container
+    
+    -- Ana çerçeve
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 550, 0, 350)
+    mainFrame.Position = UDim2.new(0.5, -275, 0.5, -175)
+    mainFrame.BackgroundColor3 = colors.background
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Draggable = true
+    mainFrame.Parent = mainGUI
+    
+    local mainCorner = Instance.new("UICorner")
+    mainCorner.CornerRadius = UDim.new(0, 10)
+    mainCorner.Parent = mainFrame
+    
+    -- Başlık çubuğu
+    local titleBar = Instance.new("Frame")
+    titleBar.Name = "TitleBar"
+    titleBar.Size = UDim2.new(1, 0, 0, 40)
+    titleBar.BackgroundColor3 = colors.header
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = mainFrame
+    
+    local titleCorner = Instance.new("UICorner")
+    titleCorner.CornerRadius = UDim.new(0, 10)
     titleCorner.Parent = titleBar
     
-    local titleBottomFrame = Instance.new("Frame")
-    titleBottomFrame.Size = UDim2.new(1, 0, 0, 15)
-    titleBottomFrame.Position = UDim2.new(0, 0, 1, -15)
-    titleBottomFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-    titleBottomFrame.BorderSizePixel = 0
-    titleBottomFrame.ZIndex = 0
-    titleBottomFrame.Parent = titleBar
+    local titleCoverBar = Instance.new("Frame")
+    titleCoverBar.Size = UDim2.new(1, 0, 0, 10)
+    titleCoverBar.Position = UDim2.new(0, 0, 1, -10)
+    titleCoverBar.BackgroundColor3 = colors.header
+    titleCoverBar.BorderSizePixel = 0
+    titleCoverBar.ZIndex = 0
+    titleCoverBar.Parent = titleBar
     
-    local title = Instance.new("TextLabel")
-    title.Name = "Title"
-    title.Size = UDim2.new(1, -120, 1, 0)
-    title.Position = UDim2.new(0, 10, 0, 0)
-    title.BackgroundTransparency = 1
-    title.Text = "PowerPlay GUI"
-    title.TextColor3 = Color3.fromRGB(240, 240, 240)
-    title.Font = Enum.Font.SourceSansBold
-    title.TextSize = 18
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.Parent = titleBar
+    -- Başlık metni
+    local titleText = Instance.new("TextLabel")
+    titleText.Size = UDim2.new(1, -100, 1, 0)
+    titleText.Position = UDim2.new(0, 15, 0, 0)
+    titleText.BackgroundTransparency = 1
+    titleText.Text = "KİLASİK GUI"
+    titleText.Font = Enum.Font.GothamBold
+    titleText.TextSize = 18
+    titleText.TextColor3 = colors.text
+    titleText.TextXAlignment = Enum.TextXAlignment.Left
+    titleText.Parent = titleBar
     
-    -- Close button
+    -- Kapat butonu
     local closeButton = Instance.new("TextButton")
-    closeButton.Name = "CloseButton"
     closeButton.Size = UDim2.new(0, 30, 0, 30)
-    closeButton.Position = UDim2.new(1, -30, 0, 0)
-    closeButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
+    closeButton.Position = UDim2.new(1, -35, 0, 5)
+    closeButton.BackgroundColor3 = colors.warning
     closeButton.Text = "X"
-    closeButton.TextColor3 = Color3.fromRGB(240, 240, 240)
-    closeButton.Font = Enum.Font.SourceSansBold
-    closeButton.TextSize = 18
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.TextSize = 16
+    closeButton.TextColor3 = colors.text
     closeButton.BorderSizePixel = 0
+    closeButton.AutoButtonColor = false
+    closeButton.Parent = titleBar
     
     local closeCorner = Instance.new("UICorner")
     closeCorner.CornerRadius = UDim.new(0, 6)
     closeCorner.Parent = closeButton
     
-    closeButton.Parent = titleBar
-    
-    -- Minimize button
+    -- Minimize butonu
     local minimizeButton = Instance.new("TextButton")
-    minimizeButton.Name = "MinimizeButton"
     minimizeButton.Size = UDim2.new(0, 30, 0, 30)
-    minimizeButton.Position = UDim2.new(1, -70, 0, 0)
-    minimizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 180)
-    minimizeButton.Text = "_"
-    minimizeButton.TextColor3 = Color3.fromRGB(240, 240, 240)
-    minimizeButton.Font = Enum.Font.SourceSansBold
-    minimizeButton.TextSize = 18
+    minimizeButton.Position = UDim2.new(1, -70, 0, 5)
+    minimizeButton.BackgroundColor3 = colors.neutralLight
+    minimizeButton.Text = "-"
+    minimizeButton.Font = Enum.Font.GothamBold
+    minimizeButton.TextSize = 20
+    minimizeButton.TextColor3 = colors.text
     minimizeButton.BorderSizePixel = 0
+    minimizeButton.AutoButtonColor = false
+    minimizeButton.Parent = titleBar
     
     local minimizeCorner = Instance.new("UICorner")
     minimizeCorner.CornerRadius = UDim.new(0, 6)
     minimizeCorner.Parent = minimizeButton
     
-    minimizeButton.Parent = titleBar
+    -- Kategori sekmesi
+    local categoryFrame = Instance.new("Frame")
+    categoryFrame.Name = "CategoryFrame"
+    categoryFrame.Size = UDim2.new(0, 130, 1, -40)
+    categoryFrame.Position = UDim2.new(0, 0, 0, 40)
+    categoryFrame.BackgroundColor3 = colors.categoryBG
+    categoryFrame.BorderSizePixel = 0
+    categoryFrame.Parent = mainFrame
     
-    titleBar.Parent = mainFrame
+    local categoryButtons = {}
     
-    -- Create navigation sidebar
-    local navigationFrame = Instance.new("Frame")
-    navigationFrame.Name = "Navigation"
-    navigationFrame.Size = UDim2.new(0, 120, 1, -60)
-    navigationFrame.Position = UDim2.new(0, 0, 0, 30)
-    navigationFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
-    navigationFrame.BorderSizePixel = 0
-    
-    -- Create navigation buttons
+    -- Kategori butonları
     for i, category in ipairs(categories) do
-        local button = Instance.new("TextButton")
-        button.Name = category .. "Button"
-        button.Size = UDim2.new(1, 0, 0, 40)
-        button.Position = UDim2.new(0, 0, 0, (i-1) * 50)
-        button.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-        button.Text = category
-        button.TextColor3 = Color3.fromRGB(200, 200, 200)
-        button.Font = Enum.Font.SourceSansSemibold
-        button.TextSize = 16
-        button.BorderSizePixel = 0
+        local categoryButton = Instance.new("TextButton")
+        categoryButton.Name = category .. "Button"
+        categoryButton.Size = UDim2.new(1, -20, 0, 35)
+        categoryButton.Position = UDim2.new(0, 10, 0, 10 + (i-1) * 40)
+        categoryButton.BackgroundColor3 = category == activeTab and colors.buttonSelected or colors.button
+        categoryButton.Text = category
+        categoryButton.Font = Enum.Font.GothamSemibold
+        categoryButton.TextSize = 14
+        categoryButton.TextColor3 = colors.text
+        categoryButton.BorderSizePixel = 0
+        categoryButton.AutoButtonColor = false
+        categoryButton.Parent = categoryFrame
         
-        local buttonCorner = Instance.new("UICorner")
-        buttonCorner.CornerRadius = UDim.new(0, 4)
-        buttonCorner.Parent = button
+        local categoryCorner = Instance.new("UICorner")
+        categoryCorner.CornerRadius = UDim.new(0, 6)
+        categoryCorner.Parent = categoryButton
         
-        button.Parent = navigationFrame
-    end
-    
-    navigationFrame.Parent = mainFrame
-    
-    -- Create content frame
-    local contentFrame = Instance.new("Frame")
-    contentFrame.Name = "Content"
-    contentFrame.Size = UDim2.new(1, -120, 1, -60)
-    contentFrame.Position = UDim2.new(0, 120, 0, 30)
-    contentFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    contentFrame.BorderSizePixel = 0
-    
-    -- Create pages
-    for _, category in ipairs(categories) do
-        local page = Instance.new("Frame")
-        page.Name = category .. "Page"
-        page.Size = UDim2.new(1, 0, 1, 0)
-        page.BackgroundTransparency = 1
-        page.Visible = false
-        
-        if category == "Home" then
-            -- Welcome text
-            local welcomeText = Instance.new("TextLabel")
-            welcomeText.Name = "WelcomeText"
-            welcomeText.Size = UDim2.new(1, -40, 0, 60)
-            welcomeText.Position = UDim2.new(0, 20, 0, 20)
-            welcomeText.BackgroundTransparency = 1
-            welcomeText.Text = "Welcome to PowerPlay GUI!"
-            welcomeText.TextColor3 = Color3.fromRGB(240, 240, 240)
-            welcomeText.Font = Enum.Font.SourceSansBold
-            welcomeText.TextSize = 24
-            welcomeText.TextXAlignment = Enum.TextXAlignment.Left
-            welcomeText.Parent = page
-            
-            -- Stats frame
-            local statsFrame = Instance.new("Frame")
-            statsFrame.Name = "StatsFrame"
-            statsFrame.Size = UDim2.new(1, -40, 0, 100)
-            statsFrame.Position = UDim2.new(0, 20, 0, 80)
-            statsFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-            statsFrame.BorderSizePixel = 0
-            
-            local statsCorner = Instance.new("UICorner")
-            statsCorner.CornerRadius = UDim.new(0, 6)
-            statsCorner.Parent = statsFrame
-            
-            local statsTitle = Instance.new("TextLabel")
-            statsTitle.Size = UDim2.new(1, 0, 0, 30)
-            statsTitle.BackgroundTransparency = 1
-            statsTitle.Text = "Statistics"
-            statsTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
-            statsTitle.Font = Enum.Font.SourceSansSemibold
-            statsTitle.TextSize = 18
-            statsTitle.Parent = statsFrame
-            
-            local activeFeatures = Instance.new("TextLabel")
-            activeFeatures.Name = "ActiveFeatures"
-            activeFeatures.Size = UDim2.new(1, -20, 0, 20)
-            activeFeatures.Position = UDim2.new(0, 10, 0, 40)
-            activeFeatures.BackgroundTransparency = 1
-            activeFeatures.Text = "Active Features: 0/" .. #features
-            activeFeatures.TextColor3 = Color3.fromRGB(240, 240, 240)
-            activeFeatures.Font = Enum.Font.SourceSans
-            activeFeatures.TextSize = 16
-            activeFeatures.TextXAlignment = Enum.TextXAlignment.Left
-            activeFeatures.Parent = statsFrame
-            
-            local playTime = Instance.new("TextLabel")
-            playTime.Size = UDim2.new(1, -20, 0, 20)
-            playTime.Position = UDim2.new(0, 10, 0, 70)
-            playTime.BackgroundTransparency = 1
-            playTime.Text = "Session Time: 00:00:00"
-            playTime.TextColor3 = Color3.fromRGB(240, 240, 240)
-            playTime.Font = Enum.Font.SourceSans
-            playTime.TextSize = 16
-            playTime.TextXAlignment = Enum.TextXAlignment.Left
-            playTime.Parent = statsFrame
-            
-            statsFrame.Parent = page
-            
-            -- Quick access frame
-            local quickAccessFrame = Instance.new("Frame")
-            quickAccessFrame.Name = "QuickAccessFrame"
-            quickAccessFrame.Size = UDim2.new(1, -40, 0, 100)
-            quickAccessFrame.Position = UDim2.new(0, 20, 0, 200)
-            quickAccessFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-            quickAccessFrame.BorderSizePixel = 0
-            
-            local quickAccessCorner = Instance.new("UICorner")
-            quickAccessCorner.CornerRadius = UDim.new(0, 6)
-            quickAccessCorner.Parent = quickAccessFrame
-            
-            local quickAccessTitle = Instance.new("TextLabel")
-            quickAccessTitle.Size = UDim2.new(1, 0, 0, 30)
-            quickAccessTitle.BackgroundTransparency = 1
-            quickAccessTitle.Text = "Quick Access"
-            quickAccessTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
-            quickAccessTitle.Font = Enum.Font.SourceSansSemibold
-            quickAccessTitle.TextSize = 18
-            quickAccessTitle.Parent = quickAccessFrame
-            
-            -- Create quick access buttons for popular features
-            local popularFeatures = {"Speed Boost", "Wall Hack", "ESP"}
-            for i, featureName in ipairs(popularFeatures) do
-                local quickButton = Instance.new("TextButton")
-                quickButton.Name = featureName .. "QuickButton"
-                quickButton.Size = UDim2.new(0, 100, 0, 30)
-                quickButton.Position = UDim2.new(0, 10 + (i-1) * 120, 0, 40)
-                quickButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-                quickButton.Text = featureName
-                quickButton.TextColor3 = Color3.fromRGB(240, 240, 240)
-                quickButton.Font = Enum.Font.SourceSans
-                quickButton.TextSize = 14
-                quickButton.BorderSizePixel = 0
-                
-                local quickButtonCorner = Instance.new("UICorner")
-                quickButtonCorner.CornerRadius = UDim.new(0, 4)
-                quickButtonCorner.Parent = quickButton
-                
-                quickButton.Parent = quickAccessFrame
-            end
-            
-            quickAccessFrame.Parent = page
-        else
-            -- Content container for other pages
-            local content = Instance.new("ScrollingFrame")
-            content.Name = "Content"
-            content.Size = UDim2.new(1, -20, 1, -20)
-            content.Position = UDim2.new(0, 10, 0, 10)
-            content.BackgroundTransparency = 1
-            content.ScrollBarThickness = 6
-            content.ScrollingDirection = Enum.ScrollingDirection.Y
-            content.CanvasSize = UDim2.new(0, 0, 0, 400) -- Will be adjusted based on content
-            
-            -- Create feature buttons specific to this category
-            local yPos = 10
-            for _, feature in ipairs(features) do
-                if feature.category == category then
-                    local featureButton = Instance.new("TextButton")
-                    featureButton.Name = feature.name .. "Button"
-                    featureButton.Size = UDim2.new(1, -20, 0, 60)
-                    featureButton.Position = UDim2.new(0, 10, 0, yPos)
-                    featureButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-                    featureButton.Text = ""
-                    featureButton.BorderSizePixel = 0
-                    
-                    local featureCorner = Instance.new("UICorner")
-                    featureCorner.CornerRadius = UDim.new(0, 6)
-                    featureCorner.Parent = featureButton
-                    
-                    local featureName = Instance.new("TextLabel")
-                    featureName.Size = UDim2.new(1, -20, 0, 25)
-                    featureName.Position = UDim2.new(0, 60, 0, 5)
-                    featureName.BackgroundTransparency = 1
-                    featureName.Text = feature.name
-                    featureName.TextColor3 = Color3.fromRGB(240, 240, 240)
-                    featureName.Font = Enum.Font.SourceSansBold
-                    featureName.TextSize = 18
-                    featureName.TextXAlignment = Enum.TextXAlignment.Left
-                    featureName.Parent = featureButton
-                    
-                    local featureDesc = Instance.new("TextLabel")
-                    featureDesc.Name = "Tooltip"
-                    featureDesc.Size = UDim2.new(1, -20, 0, 20)
-                    featureDesc.Position = UDim2.new(0, 60, 0, 30)
-                    featureDesc.BackgroundTransparency = 1
-                    featureDesc.Text = feature.description
-                    featureDesc.TextColor3 = Color3.fromRGB(200, 200, 200)
-                    featureDesc.Font = Enum.Font.SourceSans
-                    featureDesc.TextSize = 14
-                    featureDesc.TextXAlignment = Enum.TextXAlignment.Left
-                    featureDesc.Parent = featureButton
-                    
-                    local featureIcon = Instance.new("ImageLabel")
-                    featureIcon.Size = UDim2.new(0, 40, 0, 40)
-                    featureIcon.Position = UDim2.new(0, 10, 0, 10)
-                    featureIcon.BackgroundTransparency = 1
-                    featureIcon.Image = "rbxassetid://6072557440" -- Placeholder icon
-                    featureIcon.Parent = featureButton
-                    
-                    local keybind = Instance.new("TextLabel")
-                    keybind.Name = "Keybind"
-                    keybind.Size = UDim2.new(0, 40, 0, 20)
-                    keybind.Position = UDim2.new(1, -50, 0, 20)
-                    keybind.BackgroundTransparency = 1
-                    keybind.Text = "[" .. feature.keyBind .. "]"
-                    keybind.TextColor3 = Color3.fromRGB(200, 200, 200)
-                    keybind.Font = Enum.Font.SourceSans
-                    keybind.TextSize = 14
-                    keybind.TextXAlignment = Enum.TextXAlignment.Right
-                    keybind.Parent = featureButton
-                    
-                    featureButton.Parent = content
-                    yPos = yPos + 70
-                end
-            end
-            
-            -- If this is the utility page, add teleport locations list
-            if category == "Utility" then
-                -- Add a gap
-                yPos = yPos + 20
-                
-                -- Teleport locations title
-                local locationsTitle = Instance.new("TextLabel")
-                locationsTitle.Size = UDim2.new(1, -20, 0, 30)
-                locationsTitle.Position = UDim2.new(0, 10, 0, yPos)
-                locationsTitle.BackgroundTransparency = 1
-                locationsTitle.Text = "Teleport Locations"
-                locationsTitle.TextColor3 = Color3.fromRGB(240, 240, 240)
-                locationsTitle.Font = Enum.Font.SourceSansSemibold
-                locationsTitle.TextSize = 18
-                locationsTitle.TextXAlignment = Enum.TextXAlignment.Left
-                locationsTitle.Parent = content
-                
-                yPos = yPos + 40
-                
-                -- Teleport locations list
-                local locationsList = Instance.new("Frame")
-                locationsList.Name = "TeleportLocationsList"
-                locationsList.Size = UDim2.new(1, -20, 0, 100)
-                locationsList.Position = UDim2.new(0, 10, 0, yPos)
-                locationsList.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
-                locationsList.BorderSizePixel = 0
-                
-                local locationsCorner = Instance.new("UICorner")
-                locationsCorner.CornerRadius = UDim.new(0, 6)
-                locationsCorner.Parent = locationsList
-                
-                -- Placeholder for locations (will be populated when teleport is activated)
-                local placeholderText = Instance.new("TextLabel")
-                placeholderText.Size = UDim2.new(1, 0, 1, 0)
-                placeholderText.BackgroundTransparency = 1
-                placeholderText.Text = "Activate Teleport to detect locations"
-                placeholderText.TextColor3 = Color3.fromRGB(200, 200, 200)
-                placeholderText.Font = Enum.Font.SourceSans
-                placeholderText.TextSize = 16
-                placeholderText.Parent = locationsList
-                
-                locationsList.Parent = content
-                
-                yPos = yPos + 120
-                
-                -- Save current location button
-                local saveLocationButton = Instance.new("TextButton")
-                saveLocationButton.Name = "SaveLocationButton"
-                saveLocationButton.Size = UDim2.new(0, 150, 0, 30)
-                saveLocationButton.Position = UDim2.new(0, 10, 0, yPos)
-                saveLocationButton.BackgroundColor3 = Color3.fromRGB(60, 120, 60)
-                saveLocationButton.Text = "Save Current Location"
-                saveLocationButton.TextColor3 = Color3.fromRGB(240, 240, 240)
-                saveLocationButton.Font = Enum.Font.SourceSans
-                saveLocationButton.TextSize = 14
-                saveLocationButton.BorderSizePixel = 0
-                
-                local saveLocationCorner = Instance.new("UICorner")
-                saveLocationCorner.CornerRadius = UDim.new(0, 4)
-                saveLocationCorner.Parent = saveLocationButton
-                
-                saveLocationButton.Parent = content
-                
-                -- Text box for custom location name
-                local locationNameBox = Instance.new("TextBox")
-                locationNameBox.Name = "LocationNameBox"
-                locationNameBox.Size = UDim2.new(0, 150, 0, 30)
-                locationNameBox.Position = UDim2.new(0, 170, 0, yPos)
-                locationNameBox.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-                locationNameBox.Text = ""
-                locationNameBox.PlaceholderText = "Location Name"
-                locationNameBox.TextColor3 = Color3.fromRGB(240, 240, 240)
-                locationNameBox.Font = Enum.Font.SourceSans
-                locationNameBox.TextSize = 14
-                locationNameBox.BorderSizePixel = 0
-                
-                local locationNameCorner = Instance.new("UICorner")
-                locationNameCorner.CornerRadius = UDim.new(0, 4)
-                locationNameCorner.Parent = locationNameBox
-                
-                locationNameBox.Parent = content
-            end
-            
-            -- Adjust canvas size
-            content.CanvasSize = UDim2.new(0, 0, 0, yPos + 30)
-            content.Parent = page
-        end
-        
-        page.Parent = contentFrame
-    end
-    
-    contentFrame.Parent = mainFrame
-    
-    -- Create status bar
-    local statusBar = Instance.new("Frame")
-    statusBar.Name = "StatusBar"
-    statusBar.Size = UDim2.new(1, 0, 0, 30)
-    statusBar.Position = UDim2.new(0, 0, 1, -30)
-    statusBar.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-    statusBar.BorderSizePixel = 0
-    
-    local statusText = Instance.new("TextLabel")
-    statusText.Name = "StatusText"
-    statusText.Size = UDim2.new(1, -20, 1, 0)
-    statusText.Position = UDim2.new(0, 10, 0, 0)
-    statusText.BackgroundTransparency = 1
-    statusText.Text = "Ready"
-    statusText.TextColor3 = Color3.fromRGB(200, 200, 200)
-    statusText.Font = Enum.Font.SourceSans
-    statusText.TextSize = 14
-    statusText.TextXAlignment = Enum.TextXAlignment.Left
-    statusText.Parent = statusBar
-    
-    statusBar.Parent = mainFrame
-    
-    -- Parent to PlayerGui
-    mainFrame.Parent = screenGui
-    screenGui.Parent = playerGui
-    
-    -- Set created flag
-    guiCreated = true
-    
-    return screenGui, mainFrame
-end
-
--- Set up interactions for the GUI
-function setupGuiInteractions()
-    if not mainFrame then return end
-    
-    -- Set up navigation buttons
-    for _, category in ipairs(categories) do
-        local button = mainFrame:FindFirstChild("Navigation"):FindFirstChild(category.."Button")
-        if button then
-            button.MouseButton1Click:Connect(function()
-                switchPage(category)
-            end)
-        end
-    end
-    
-    -- Set up title bar functionality
-    local titleBar = mainFrame:FindFirstChild("TitleBar")
-    local isDragging = false
-    local dragStartPosition = nil
-    local dragStartOffset = nil
-    
-    titleBar.MouseButton1Down:Connect(function(x, y)
-        isDragging = true
-        dragStartPosition = Vector2.new(x, y)
-        dragStartOffset = mainFrame.Position
-    end)
-    
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            isDragging = false
-        end
-    end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if isDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = Vector2.new(input.Position.X, input.Position.Y) - dragStartPosition
-            local newPosition = UDim2.new(
-                dragStartOffset.X.Scale,
-                dragStartOffset.X.Offset + delta.X,
-                dragStartOffset.Y.Scale,
-                dragStartOffset.Y.Offset + delta.Y
-            )
-            mainFrame.Position = newPosition
-        end
-    end)
-    
-    -- Set up close and minimize buttons
-    local closeButton = titleBar:FindFirstChild("CloseButton")
-    closeButton.MouseButton1Click:Connect(function()
-        toggleGui()
-    end)
-    
-    local minimizeButton = titleBar:FindFirstChild("MinimizeButton")
-    minimizeButton.MouseButton1Click:Connect(function()
-        UIEffects.minimizeFrame(mainFrame)
-    end)
-    
-    -- Set up feature buttons
-    for _, feature in ipairs(features) do
-        for _, categoryName in ipairs(categories) do
-            local categoryPage = mainFrame:FindFirstChild("Content"):FindFirstChild(categoryName.."Page")
-            if categoryPage then
-                local content = categoryPage:FindFirstChild("Content")
-                if content then
-                    local featureButton = content:FindFirstChild(feature.name.."Button")
-                    if featureButton then
-                        featureButton.MouseButton1Click:Connect(function()
-                            toggleFeature(feature.name)
-                        end)
-                    end
-                end
-            end
-        end
-        
-        -- Also connect quick access buttons on home page
-        local homePage = mainFrame:FindFirstChild("Content"):FindFirstChild("HomePage")
-        if homePage then
-            local quickAccessFrame = homePage:FindFirstChild("QuickAccessFrame")
-            if quickAccessFrame then
-                local quickButton = quickAccessFrame:FindFirstChild(feature.name.."QuickButton")
-                if quickButton then
-                    quickButton.MouseButton1Click:Connect(function()
-                        toggleFeature(feature.name)
-                    end)
-                end
-            end
-        end
-    end
-    
-    -- Set up teleport-specific UI
-    local utilityPage = mainFrame:FindFirstChild("Content"):FindFirstChild("UtilityPage")
-    if utilityPage then
-        local content = utilityPage:FindFirstChild("Content")
-        if content then
-            local saveLocationButton = content:FindFirstChild("SaveLocationButton")
-            local locationNameBox = content:FindFirstChild("LocationNameBox")
-            
-            if saveLocationButton and locationNameBox then
-                saveLocationButton.MouseButton1Click:Connect(function()
-                    local locationName = locationNameBox.Text
-                    if locationName == "" then
-                        setStatus("Please enter a location name")
-                        return
-                    end
-                    
-                    local success, result = pcall(function()
-                        return Teleport.saveCurrentLocation(player, locationName)
-                    end)
-                    
-                    if success and result then
-                        locationNameBox.Text = ""
-                        setStatus("Location saved: " .. locationName)
-                        updateTeleportLocationsList()
-                    else
-                        setStatus("Failed to save location: " .. (result or "unknown error"))
-                    end
-                end)
-            end
-        end
-    end
-    
-    -- Set up keyboard shortcut (Right Shift to toggle GUI)
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if not gameProcessed then
-            if input.KeyCode == Enum.KeyCode.RightShift then
-                toggleGui()
-            else
-                -- Check for feature keybinds
-                for _, feature in ipairs(features) do
-                    if input.KeyCode == Enum.KeyCode[feature.keyBind] then
-                        toggleFeature(feature.name)
-                    end
-                end
-            end
-        end
-    end)
-}
-
--- Update teleport locations list in the UI
-function updateTeleportLocationsList()
-    local utilityPage = mainFrame:FindFirstChild("Content"):FindFirstChild("UtilityPage")
-    if not utilityPage then return end
-    
-    local content = utilityPage:FindFirstChild("Content")
-    if not content then return end
-    
-    local locationsList = content:FindFirstChild("TeleportLocationsList")
-    if not locationsList then return end
-    
-    -- Clear existing list
-    for _, child in ipairs(locationsList:GetChildren()) do
-        if child:IsA("TextButton") or (child:IsA("TextLabel") and child.Name ~= "Title") then
-            child:Destroy()
-        end
-    end
-    
-    -- Get locations from Teleport module
-    local success, locations = pcall(function()
-        return Teleport.getLocations()
-    end)
-    
-    if not success or #locations == 0 then
-        -- Show placeholder text if no locations
-        local placeholderText = locationsList:FindFirstChild("PlaceholderText")
-        if not placeholderText then
-            placeholderText = Instance.new("TextLabel")
-            placeholderText.Name = "PlaceholderText"
-            placeholderText.Size = UDim2.new(1, 0, 1, 0)
-            placeholderText.BackgroundTransparency = 1
-            placeholderText.Text = "No locations found"
-            placeholderText.TextColor3 = Color3.fromRGB(200, 200, 200)
-            placeholderText.Font = Enum.Font.SourceSans
-            placeholderText.TextSize = 16
-            placeholderText.Parent = locationsList
-        end
-        return
-    end
-    
-    -- Remove placeholder
-    local placeholder = locationsList:FindFirstChild("PlaceholderText")
-    if placeholder then
-        placeholder:Destroy()
-    end
-    
-    -- Add location buttons
-    for i, location in ipairs(locations) do
-        local locationButton = Instance.new("TextButton")
-        locationButton.Name = location.name .. "Button"
-        locationButton.Size = UDim2.new(1, -20, 0, 30)
-        locationButton.Position = UDim2.new(0, 10, 0, 10 + (i-1) * 35)
-        locationButton.BackgroundColor3 = location.isCustom 
-            and Color3.fromRGB(60, 80, 120) 
-            or Color3.fromRGB(60, 60, 80)
-        locationButton.Text = location.name
-        locationButton.TextColor3 = Color3.fromRGB(240, 240, 240)
-        locationButton.Font = Enum.Font.SourceSans
-        locationButton.TextSize = 14
-        locationButton.BorderSizePixel = 0
-        
-        local locationCorner = Instance.new("UICorner")
-        locationCorner.CornerRadius = UDim.new(0, 4)
-        locationCorner.Parent = locationButton
-        
-        locationButton.MouseButton1Click:Connect(function()
-            local success, result = pcall(function()
-                return Teleport.teleportToLocation(player, location.name)
-            end)
-            
-            if success then
-                setStatus("Teleporting to " .. location.name)
-            else
-                setStatus("Failed to teleport: " .. (result or "unknown error"))
+        -- Hover efekti
+        categoryButton.MouseEnter:Connect(function()
+            if activeTab ~= category then
+                categoryButton.BackgroundColor3 = colors.buttonHover
             end
         end)
         
-        locationButton.Parent = locationsList
+        categoryButton.MouseLeave:Connect(function()
+            if activeTab ~= category then
+                categoryButton.BackgroundColor3 = colors.button
+            end
+        end)
+        
+        -- Tıklama fonksiyonu
+        categoryButton.MouseButton1Click:Connect(function()
+            -- Aktif sekmeyi değiştir
+            if activeTab ~= category then
+                -- Önceki butonun rengini sıfırla
+                for _, btn in pairs(categoryButtons) do
+                    btn.BackgroundColor3 = colors.button
+                end
+                
+                -- Yeni butonun rengini değiştir
+                categoryButton.BackgroundColor3 = colors.buttonSelected
+                
+                -- Aktif sekmeyi güncelle
+                activeTab = category
+                
+                -- İçerik panelini güncelle
+                updateContentPanel()
+            end
+        end)
+        
+        categoryButtons[category] = categoryButton
     end
     
-    -- Adjust list size
-    locationsList.Size = UDim2.new(1, -20, 0, math.min(200, 10 + #locations * 35 + 10))
-end
-
--- Run update loop for active features
-function updateLoop()
-    -- Track session time
-    local sessionStartTime = tick()
+    -- İçerik paneli
+    local contentFrame = Instance.new("Frame")
+    contentFrame.Name = "ContentFrame"
+    contentFrame.Size = UDim2.new(1, -140, 1, -90)
+    contentFrame.Position = UDim2.new(0, 135, 0, 45)
+    contentFrame.BackgroundColor3 = colors.background
+    contentFrame.BorderSizePixel = 0
+    contentFrame.Parent = mainFrame
     
-    RunService.RenderStepped:Connect(function(deltaTime)
-        if not guiCreated then return end
+    -- Arama çubuğu
+    local searchBar = Instance.new("TextBox")
+    searchBar.Name = "SearchBar"
+    searchBar.Size = UDim2.new(1, -15, 0, 35)
+    searchBar.Position = UDim2.new(0, 5, 0, 5)
+    searchBar.BackgroundColor3 = colors.neutralDark
+    searchBar.PlaceholderText = "Komut ara..."
+    searchBar.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+    searchBar.Text = ""
+    searchBar.Font = Enum.Font.Gotham
+    searchBar.TextSize = 14
+    searchBar.TextColor3 = colors.text
+    searchBar.BorderSizePixel = 0
+    searchBar.ClearTextOnFocus = false
+    searchBar.Parent = contentFrame
+    
+    local searchBarCorner = Instance.new("UICorner")
+    searchBarCorner.CornerRadius = UDim.new(0, 6)
+    searchBarCorner.Parent = searchBar
+    
+    -- Komut listesi
+    local commandList = Instance.new("ScrollingFrame")
+    commandList.Name = "CommandList"
+    commandList.Size = UDim2.new(1, -10, 1, -50)
+    commandList.Position = UDim2.new(0, 5, 0, 45)
+    commandList.BackgroundTransparency = 1
+    commandList.BorderSizePixel = 0
+    commandList.ScrollBarThickness = 6
+    commandList.ScrollBarImageColor3 = colors.neutralLight
+    commandList.CanvasSize = UDim2.new(0, 0, 0, 0) -- Otomatik ayarlanacak
+    commandList.Parent = contentFrame
+    
+    -- Liste düzeni
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Padding = UDim.new(0, 5)
+    listLayout.Parent = commandList
+    
+    -- Durum çubuğu
+    local statusBar = Instance.new("Frame")
+    statusBar.Name = "StatusBar"
+    statusBar.Size = UDim2.new(1, -135, 0, 30)
+    statusBar.Position = UDim2.new(0, 135, 1, -35)
+    statusBar.BackgroundColor3 = colors.neutralDark
+    statusBar.BorderSizePixel = 0
+    statusBar.Parent = mainFrame
+    
+    local statusCorner = Instance.new("UICorner")
+    statusCorner.CornerRadius = UDim.new(0, 6)
+    statusCorner.Parent = statusBar
+    
+    -- Durum metni
+    statusLabel = Instance.new("TextLabel")
+    statusLabel.Size = UDim2.new(1, -20, 1, 0)
+    statusLabel.Position = UDim2.new(0, 10, 0, 0)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.Text = "Hazır"
+    statusLabel.Font = Enum.Font.Gotham
+    statusLabel.TextSize = 14
+    statusLabel.TextColor3 = colors.text
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statusLabel.Parent = statusBar
+    
+    -- Kredi etiketi
+    local creditLabel = Instance.new("TextLabel")
+    creditLabel.Size = UDim2.new(0, 130, 0, 30)
+    creditLabel.Position = UDim2.new(0, 0, 1, -30)
+    creditLabel.BackgroundColor3 = colors.categoryBG
+    creditLabel.Text = "KİLASİK"
+    creditLabel.Font = Enum.Font.GothamBold
+    creditLabel.TextSize = 14
+    creditLabel.TextColor3 = Color3.fromRGB(255, 215, 0) -- Altın rengi
+    creditLabel.BorderSizePixel = 0
+    creditLabel.Parent = mainFrame
+    
+    -- Hover ve Tıklama Efektleri
+    closeButton.MouseEnter:Connect(function()
+        closeButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+    end)
+    
+    closeButton.MouseLeave:Connect(function()
+        closeButton.BackgroundColor3 = colors.warning
+    end)
+    
+    minimizeButton.MouseEnter:Connect(function()
+        minimizeButton.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+    end)
+    
+    minimizeButton.MouseLeave:Connect(function()
+        minimizeButton.BackgroundColor3 = colors.neutralLight
+    end)
+    
+    -- Buton işlevleri
+    closeButton.MouseButton1Click:Connect(function()
+        mainGUI:Destroy()
+        guiCreated = false
+    end)
+    
+    local minimized = false
+    minimizeButton.MouseButton1Click:Connect(function()
+        minimized = not minimized
         
-        -- Update session time on home page
-        local homePage = mainFrame:FindFirstChild("Content"):FindFirstChild("HomePage")
-        if homePage and homePage.Visible then
-            local statsFrame = homePage:FindFirstChild("StatsFrame")
-            if statsFrame then
-                local playTime = statsFrame:FindFirstChild("Session Time")
-                if playTime then
-                    local sessionTime = tick() - sessionStartTime
-                    local hours = math.floor(sessionTime / 3600)
-                    local minutes = math.floor((sessionTime % 3600) / 60)
-                    local seconds = math.floor(sessionTime % 60)
-                    playTime.Text = string.format("Session Time: %02d:%02d:%02d", hours, minutes, seconds)
-                end
-            end
-        end
-        
-        -- Update active features
-        for featureName, isActive in pairs(activeFeatures) do
-            if isActive then
-                for _, feature in ipairs(features) do
-                    if feature.name == featureName then
-                        pcall(function()
-                            feature.module.update(deltaTime, player)
-                        end)
-                        break
-                    end
-                end
-            end
+        if minimized then
+            contentFrame.Visible = false
+            categoryFrame.Visible = false
+            statusBar.Visible = false
+            creditLabel.Visible = false
+            mainFrame.Size = UDim2.new(0, 550, 0, 40)
+        else
+            contentFrame.Visible = true
+            categoryFrame.Visible = true
+            statusBar.Visible = true
+            creditLabel.Visible = true
+            mainFrame.Size = UDim2.new(0, 550, 0, 350)
         end
     end)
+    
+    -- Arama fonksiyonu
+    searchBar.Changed:Connect(function(prop)
+        if prop == "Text" then
+            updateCommandList(searchBar.Text)
+        end
+    end)
+    
+    -- İçerik panelini güncelleme fonksiyonu
+    function updateContentPanel()
+        updateCommandList(searchBar.Text)
+    end
+    
+    -- Komut listesini güncelleme fonksiyonu
+    function updateCommandList(searchQuery)
+        -- Listeyi temizle
+        for _, child in pairs(commandList:GetChildren()) do
+            if child:IsA("Frame") then
+                child:Destroy()
+            end
+        end
+        
+        -- Yeni komutları ekle
+        local yOffset = 0
+        local buttonHeight = 40
+        
+        for _, cmd in ipairs(commands) do
+            -- Ana kategori sekmesi ya da arama sorgusuna uyan komutları göster
+            if (activeTab == "Main" or cmd.category == activeTab) and 
+               (searchQuery == "" or string.find(string.lower(cmd.name), string.lower(searchQuery)) or 
+                string.find(string.lower(cmd.desc), string.lower(searchQuery))) then
+                
+                -- Komut butonu
+                local commandButton = Instance.new("Frame")
+                commandButton.Name = cmd.name .. "Button"
+                commandButton.Size = UDim2.new(1, -10, 0, buttonHeight)
+                commandButton.BackgroundColor3 = colors.button
+                commandButton.BorderSizePixel = 0
+                commandButton.Parent = commandList
+                
+                local commandCorner = Instance.new("UICorner")
+                commandCorner.CornerRadius = UDim.new(0, 6)
+                commandCorner.Parent = commandButton
+                
+                -- Komut adı
+                local nameLabel = Instance.new("TextLabel")
+                nameLabel.Size = UDim2.new(0.4, -10, 1, 0)
+                nameLabel.Position = UDim2.new(0, 10, 0, 0)
+                nameLabel.BackgroundTransparency = 1
+                nameLabel.Text = cmd.name
+                nameLabel.Font = Enum.Font.GothamSemibold
+                nameLabel.TextSize = 14
+                nameLabel.TextColor3 = colors.text
+                nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+                nameLabel.Parent = commandButton
+                
+                -- Komut açıklaması
+                local descLabel = Instance.new("TextLabel")
+                descLabel.Size = UDim2.new(0.6, -10, 1, 0)
+                descLabel.Position = UDim2.new(0.4, 0, 0, 0)
+                descLabel.BackgroundTransparency = 1
+                descLabel.Text = cmd.desc
+                descLabel.Font = Enum.Font.Gotham
+                descLabel.TextSize = 12
+                descLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+                descLabel.TextXAlignment = Enum.TextXAlignment.Left
+                descLabel.TextWrapped = true
+                descLabel.Parent = commandButton
+                
+                -- Arka plan buton
+                local clickButton = Instance.new("TextButton")
+                clickButton.Size = UDim2.new(1, 0, 1, 0)
+                clickButton.BackgroundTransparency = 1
+                clickButton.Text = ""
+                clickButton.ZIndex = 10
+                clickButton.Parent = commandButton
+                
+                -- Buton hover efekti
+                clickButton.MouseEnter:Connect(function()
+                    commandButton.BackgroundColor3 = colors.buttonHover
+                end)
+                
+                clickButton.MouseLeave:Connect(function()
+                    commandButton.BackgroundColor3 = colors.button
+                end)
+                
+                -- Tıklama fonksiyonu
+                clickButton.MouseButton1Click:Connect(function()
+                    -- Komutu çalıştır
+                    if cmd.func then
+                        cmd.func()
+                    end
+                    
+                    -- Buton basma efekti
+                    commandButton.BackgroundColor3 = colors.buttonSelected
+                    wait(0.1)
+                    commandButton.BackgroundColor3 = colors.button
+                end)
+                
+                yOffset = yOffset + buttonHeight + 5
+            end
+        end
+        
+        -- Canvas boyutunu ayarla
+        commandList.CanvasSize = UDim2.new(0, 0, 0, yOffset)
+    end
+    
+    -- İlk kategoriyi göster
+    updateContentPanel()
+    
+    -- GUI'yi görünür yap
+    mainGUI.Enabled = true
+    guiCreated = true
+    guiVisible = true
+    
+    -- Infinite Yield gibi RightControl tuşunu kısayol olarak ekle
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and input.KeyCode == Enum.KeyCode.RightControl then
+            -- GUI'yi aç/kapat
+            mainGUI.Enabled = not mainGUI.Enabled
+            guiVisible = mainGUI.Enabled
+        end
+    end)
+    
+    return mainGUI
 end
 
-------------------------------
--- Main Execution
-------------------------------
--- Initialize the GUI
-createGui()
-setupGuiInteractions()
-updateLoop()
+-- =====================
+-- Ana Fonksiyon
+-- =====================
 
--- Display welcome message and instructions
-switchPage("Home")
-setStatus("Welcome to PowerPlay GUI! Press RightShift to toggle.")
+-- GUI'yi başlat
+if not keyVerified then
+    createKeyVerificationGUI()
+else
+    createMainGUI()
+end
 
--- Initially hide the GUI
-mainFrame.Visible = false
+-- Sonsuz zıplama için event
+UserInputService.JumpRequest:Connect(function()
+    if infiniteJump and player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+-- Başlatma mesajı
+print("KİLASİK GUI yüklendi! Key: " .. KEY_CODE)
+print("KİLASİK GUI'yi açmak/kapatmak için RightControl tuşunu kullanın.")
