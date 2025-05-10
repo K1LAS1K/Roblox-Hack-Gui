@@ -1,11 +1,15 @@
 --[[
-  Kilasik GUI - Gelişmiş Oyun Kontrol Arayüzü
-  Bu script gelişmiş özellikler sunan bir GUI oluşturur
+  KILASIK GUI - Advanced Game Control Interface
+  This script creates a feature-rich GUI with many commands and features
   
-  Kullanım: Kodu executor'a yapıştırıp çalıştırın
+  Usage: Paste the code into your executor and run it
+  
+  Key System: Requires a valid key to use. Get the key from our Discord server.
+  
+  Credit: KILASIK
 ]]
 
--- Servisler
+-- Services
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
@@ -17,20 +21,28 @@ local CoreGui = game:GetService("CoreGui")
 local TeleportService = game:GetService("TeleportService")
 local Lighting = game:GetService("Lighting")
 local HttpService = game:GetService("HttpService")
+local MarketplaceService = game:GetService("MarketplaceService")
+local VirtualUser = game:GetService("VirtualUser")
+local NetworkClient = game:GetService("NetworkClient")
+local GuiService = game:GetService("GuiService")
 
--- Key Sistemi
-local KEY_CODE = "KILASIK2025" -- Anahtar kod
+-- Key System
+local KEY_CODE = "KILASIK2025" -- Key code
+local DISCORD_LINK = "https://discord.gg/PHxN8nadgk" -- Discord server link
 local keyVerified = false
 
--- Temel değişkenler
+-- Basic variables
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 local camera = Workspace.CurrentCamera
 local guiCreated = false
 local guiVisible = false
+local minimized = false
+local miniSize = false
 local activeTab = "Main"
+local favoriteCommands = {}
 
--- Hız ve karakter kontrolü
+-- Speed and character control
 local walkSpeed = 16
 local jumpPower = 50
 local infiniteJump = false
@@ -38,92 +50,146 @@ local noclip = false
 local flying = false
 local flySpeed = 2
 local xray = false
-local esp = false
-local aimbotEnabled = false
+local esp = {
+    enabled = false,
+    boxes = true,
+    names = true,
+    distances = true,
+    teamCheck = true,
+    teamColor = true,
+    tracers = false,
+    chams = false
+}
+local aimbotSettings = {
+    enabled = false,
+    teamCheck = true,
+    visibilityCheck = true,
+    aimPart = "Head",
+    sensitivity = 0.5,
+    fovSize = 100,
+    showFOV = true,
+    toggleKey = "RightMouse",
+    wallbangEnabled = false
+}
 local aimbotTarget = nil
 local selectedPlayers = {}
 local selectedParts = {}
 
--- GUI Renkleri
+-- GUI Colors
 local colors = {
-    background = Color3.fromRGB(30, 30, 35),
-    header = Color3.fromRGB(40, 40, 45),
-    button = Color3.fromRGB(50, 50, 60),
-    buttonHover = Color3.fromRGB(60, 60, 70),
-    buttonSelected = Color3.fromRGB(70, 90, 120),
+    background = Color3.fromRGB(25, 25, 30),
+    header = Color3.fromRGB(35, 35, 40),
+    button = Color3.fromRGB(45, 45, 55),
+    buttonHover = Color3.fromRGB(55, 55, 65),
+    buttonSelected = Color3.fromRGB(65, 105, 225),
     text = Color3.fromRGB(240, 240, 240),
-    highlight = Color3.fromRGB(70, 130, 180),
+    highlight = Color3.fromRGB(65, 105, 225),
     warning = Color3.fromRGB(200, 60, 60),
     success = Color3.fromRGB(60, 180, 75),
     neutralLight = Color3.fromRGB(70, 70, 85),
-    neutralDark = Color3.fromRGB(50, 50, 65),
-    shadow = Color3.fromRGB(20, 20, 25),
-    categoryBG = Color3.fromRGB(35, 35, 45)
+    neutralDark = Color3.fromRGB(40, 40, 50),
+    shadow = Color3.fromRGB(15, 15, 20),
+    categoryBG = Color3.fromRGB(30, 30, 35),
+    favorite = Color3.fromRGB(255, 215, 0)
 }
 
--- Tüm Komutlar
+-- All Commands
 local commands = {
-    -- Ana komutlar
-    {name = "Speed", desc = "Karakterin koşma hızını ayarla", category = "Character", func = function(speed) setWalkSpeed(tonumber(speed) or 16) end},
-    {name = "JumpPower", desc = "Karakterin zıplama gücünü ayarla", category = "Character", func = function(power) setJumpPower(tonumber(power) or 50) end},
-    {name = "InfiniteJump", desc = "Sınırsız zıplama", category = "Character", func = function() toggleInfiniteJump() end},
-    {name = "Fly", desc = "Uçma modunu aktifleştir", category = "Character", func = function() toggleFly() end},
-    {name = "Noclip", desc = "Duvarlardan geçme modunu aktifleştir", category = "Character", func = function() toggleNoclip() end},
-    {name = "XRay", desc = "Duvarları şeffaflaştır", category = "Vision", func = function() toggleXRay() end},
-    {name = "ESP", desc = "Oyuncuları ve nesneleri işaretle", category = "Vision", func = function() toggleESP() end},
-    {name = "Aimbot", desc = "Otomatik nişan alma", category = "Combat", func = function() toggleAimbot() end},
-    {name = "Teleport", desc = "Fare konumuna ışınlan", category = "Utility", func = function() teleportToMouse() end},
-    {name = "TpToPlayer", desc = "Belirli bir oyuncuya ışınlan", category = "Utility", func = function(playerName) teleportToPlayer(playerName) end},
-    {name = "Rejoin", desc = "Aynı sunucuya tekrar katıl", category = "Utility", func = function() rejoinServer() end},
-    {name = "NoFog", desc = "Sisi kaldır", category = "Vision", func = function() removeFog() end},
-    {name = "FullBright", desc = "Tam aydınlatma", category = "Vision", func = function() enableFullBright() end},
-    {name = "Invisible", desc = "Karakteri görünmez yap", category = "Character", func = function() makeInvisible() end},
-    {name = "RemoveMesh", desc = "Mesh'leri kaldır", category = "Character", func = function() removeMeshes() end},
+    -- Main commands
+    {name = "Speed", desc = "Set character walk speed", category = "Character", func = function(speed) setWalkSpeed(tonumber(speed) or 16) end, canFavorite = true},
+    {name = "JumpPower", desc = "Set character jump power", category = "Character", func = function(power) setJumpPower(tonumber(power) or 50) end, canFavorite = true},
+    {name = "InfiniteJump", desc = "Jump infinitely", category = "Character", func = function() toggleInfiniteJump() end, canFavorite = true},
+    {name = "Fly", desc = "Toggle fly mode", category = "Character", func = function() toggleFly() end, canFavorite = true},
+    {name = "Noclip", desc = "Walk through walls", category = "Character", func = function() toggleNoclip() end, canFavorite = true},
+    {name = "XRay", desc = "Make walls transparent", category = "Vision", func = function() toggleXRay() end, canFavorite = true},
+    {name = "ESP", desc = "Highlight players and objects", category = "ESP", func = function() toggleESP() end, canFavorite = true},
+    {name = "ESP Boxes", desc = "Toggle ESP boxes", category = "ESP", func = function() toggleESPOption("boxes") end, canFavorite = true},
+    {name = "ESP Names", desc = "Toggle ESP names", category = "ESP", func = function() toggleESPOption("names") end, canFavorite = true},
+    {name = "ESP Tracers", desc = "Toggle ESP tracers", category = "ESP", func = function() toggleESPOption("tracers") end, canFavorite = true},
+    {name = "ESP TeamCheck", desc = "Toggle ESP team check", category = "ESP", func = function() toggleESPOption("teamCheck") end, canFavorite = true},
+    {name = "ESP TeamColor", desc = "Toggle ESP team color", category = "ESP", func = function() toggleESPOption("teamColor") end, canFavorite = true},
+    {name = "ESP Chams", desc = "Toggle ESP chams", category = "ESP", func = function() toggleESPOption("chams") end, canFavorite = true},
+    {name = "Aimbot", desc = "Auto aim at players", category = "Combat", func = function() toggleAimbot() end, canFavorite = true},
+    {name = "Teleport", desc = "Teleport to mouse position", category = "Teleport", func = function() teleportToMouse() end, canFavorite = true},
+    {name = "ClickTP", desc = "Click to teleport (Ctrl+Click)", category = "Teleport", func = function() toggleClickTP() end, canFavorite = true},
+    {name = "TpToPlayer", desc = "Teleport to a specific player", category = "Teleport", func = function(playerName) teleportToPlayer(playerName) end, canFavorite = true},
+    {name = "GetPosition", desc = "Copy current position", category = "Teleport", func = function() copyPosition() end, canFavorite = true},
+    {name = "Rejoin", desc = "Rejoin the same server", category = "Utility", func = function() rejoinServer() end, canFavorite = true},
+    {name = "NoFog", desc = "Remove fog", category = "Vision", func = function() removeFog() end, canFavorite = true},
+    {name = "FullBright", desc = "Full brightness", category = "Vision", func = function() enableFullBright() end, canFavorite = true},
+    {name = "Invisible", desc = "Make character invisible", category = "Character", func = function() makeInvisible() end, canFavorite = true},
+    {name = "RemoveMesh", desc = "Remove meshes", category = "Character", func = function() removeMeshes() end, canFavorite = true},
     
-    -- Combat komutları
-    {name = "KillAura", desc = "Yakınındaki oyuncuları otomatik vur", category = "Combat", func = function() toggleKillAura() end},
-    {name = "InfiniteAmmo", desc = "Sınırsız mermi", category = "Combat", func = function() giveInfiniteAmmo() end},
-    {name = "GodMode", desc = "Ölümsüzlük modunu dene", category = "Combat", func = function() attemptGodMode() end},
-    {name = "AutoFarm", desc = "Otomatik kaynak toplama", category = "Utility", func = function() toggleAutoFarm() end},
-    {name = "Reach", desc = "Silah menzilini artır", category = "Combat", func = function() increaseReach() end},
+    -- Combat commands
+    {name = "Aimbot Settings", desc = "Configure aimbot options", category = "Combat", func = function() showAimbotSettings() end, canFavorite = true},
+    {name = "Aimbot FOV", desc = "Set aimbot field of view", category = "Combat", func = function(size) setAimbotFOV(tonumber(size) or 100) end, canFavorite = true},
+    {name = "Wallbang", desc = "Shoot through walls", category = "Combat", func = function() toggleWallbang() end, canFavorite = true},
+    {name = "KillAura", desc = "Auto hit nearby players", category = "Combat", func = function() toggleKillAura() end, canFavorite = true},
+    {name = "InfiniteAmmo", desc = "Unlimited ammo", category = "Combat", func = function() giveInfiniteAmmo() end, canFavorite = true},
+    {name = "GodMode", desc = "Try god mode", category = "Combat", func = function() attemptGodMode() end, canFavorite = true},
+    {name = "AutoFarm", desc = "Auto collect resources", category = "Utility", func = function() toggleAutoFarm() end, canFavorite = true},
+    {name = "Reach", desc = "Increase weapon reach", category = "Combat", func = function() increaseReach() end, canFavorite = true},
     
-    -- Troll/Eğlence komutları
-    {name = "DanceAnimate", desc = "Dans animasyonu", category = "Fun", func = function() playDanceAnimation() end},
-    {name = "FakeChat", desc = "Başka bir oyuncu gibi mesaj", category = "Fun", func = function(name, message) fakeChatMessage(name, message) end},
-    {name = "GiantSize", desc = "Karakteri dev yap", category = "Fun", func = function() makeGiantSize() end},
-    {name = "TinySize", desc = "Karakteri küçült", category = "Fun", func = function() makeTinySize() end},
-    {name = "FloatingParts", desc = "Parçaları uçur", category = "Fun", func = function() createFloatingParts() end},
-    {name = "SpinCharacter", desc = "Karakteri döndür", category = "Fun", func = function() spinCharacter() end},
+    -- Animation commands
+    {name = "Zombie", desc = "Play zombie animation", category = "Animations", func = function() playAnimation("zombie") end, canFavorite = true},
+    {name = "Ninja", desc = "Play ninja animation", category = "Animations", func = function() playAnimation("ninja") end, canFavorite = true},
+    {name = "Robot", desc = "Play robot animation", category = "Animations", func = function() playAnimation("robot") end, canFavorite = true},
+    {name = "Dab", desc = "Play dab animation", category = "Animations", func = function() playAnimation("dab") end, canFavorite = true},
+    {name = "Floss", desc = "Play floss dance", category = "Animations", func = function() playAnimation("floss") end, canFavorite = true},
+    {name = "Groove", desc = "Play groove dance", category = "Animations", func = function() playAnimation("groove") end, canFavorite = true},
+    {name = "Lay", desc = "Play lay animation", category = "Animations", func = function() playAnimation("lay") end, canFavorite = true},
+    {name = "Sit", desc = "Play sit animation", category = "Animations", func = function() playAnimation("sit") end, canFavorite = true},
+    {name = "Superhero", desc = "Play superhero animation", category = "Animations", func = function() playAnimation("superhero") end, canFavorite = true},
+    {name = "Spin", desc = "Play spin animation", category = "Animations", func = function() playAnimation("spin") end, canFavorite = true},
     
-    -- Oyuncu komutları
-    {name = "Spectate", desc = "Bir oyuncuyu izle", category = "Players", func = function(playerName) spectatePlayer(playerName) end},
-    {name = "Unspectate", desc = "İzlemeyi durdur", category = "Players", func = function() unspectatePlayer() end},
-    {name = "Goto", desc = "Bir oyuncuya git", category = "Players", func = function(playerName) goToPlayer(playerName) end},
-    {name = "Bring", desc = "Bir oyuncuyu kendine getir (çoğu oyunda çalışmaz)", category = "Players", func = function(playerName) bringPlayer(playerName) end},
-    {name = "FlingPlayer", desc = "Bir oyuncuyu fırlat (çoğu oyunda çalışmaz)", category = "Players", func = function(playerName) flingPlayer(playerName) end},
+    -- Troll/Fun commands
+    {name = "DanceAnimate", desc = "Play dance animation", category = "Fun", func = function() playDanceAnimation() end, canFavorite = true},
+    {name = "FakeChat", desc = "Send fake chat message", category = "Fun", func = function(name, message) fakeChatMessage(name, message) end, canFavorite = true},
+    {name = "GiantSize", desc = "Make character giant", category = "Fun", func = function() makeGiantSize() end, canFavorite = true},
+    {name = "TinySize", desc = "Make character tiny", category = "Fun", func = function() makeTinySize() end, canFavorite = true},
+    {name = "FloatingParts", desc = "Create floating parts", category = "Fun", func = function() createFloatingParts() end, canFavorite = true},
+    {name = "SpinCharacter", desc = "Spin your character", category = "Fun", func = function() spinCharacter() end, canFavorite = true},
+    {name = "Ultimate Fling", desc = "Advanced fling script", category = "Fun", func = function() loadUltimateFling() end, canFavorite = true},
+    {name = "Touch Fling", desc = "Fling players on touch", category = "Fun", func = function() loadTouchFling() end, canFavorite = true},
     
-    -- Araçlar
-    {name = "CopyPosition", desc = "Pozisyonu kopyala", category = "Utility", func = function() copyPosition() end},
-    {name = "BTools", desc = "İnşaat araçları ver", category = "Utility", func = function() giveBTools() end},
-    {name = "ForceField", desc = "Koruyucu kalkan", category = "Utility", func = function() applyForceField() end},
-    {name = "HighJump", desc = "Çok yükseğe zıpla", category = "Character", func = function() doHighJump() end},
-    {name = "SwimMode", desc = "Havada yüzme modu", category = "Character", func = function() toggleSwimMode() end},
+    -- Player commands
+    {name = "Spectate", desc = "Spectate a player", category = "Players", func = function(playerName) spectatePlayer(playerName) end, canFavorite = true},
+    {name = "Unspectate", desc = "Stop spectating", category = "Players", func = function() unspectatePlayer() end, canFavorite = true},
+    {name = "Goto", desc = "Go to a player", category = "Players", func = function(playerName) goToPlayer(playerName) end, canFavorite = true},
+    {name = "Bring", desc = "Bring a player to you", category = "Players", func = function(playerName) bringPlayer(playerName) end, canFavorite = true},
+    {name = "FlingPlayer", desc = "Fling a player", category = "Players", func = function(playerName) flingPlayer(playerName) end, canFavorite = true},
     
-    -- Görsel komutlar
-    {name = "Rainbow", desc = "Gökkuşağı karakter", category = "Visuals", func = function() makeRainbowCharacter() end},
-    {name = "ClearMap", desc = "Haritayı temizle", category = "Visuals", func = function() clearMap() end},
-    {name = "LowGraphics", desc = "Düşük grafik ayarları", category = "Visuals", func = function() setLowGraphics() end},
-    {name = "RemoveTextures", desc = "Dokuları kaldır", category = "Visuals", func = function() removeTextures() end},
-    {name = "ShowHitboxes", desc = "Vuruş kutularını göster", category = "Visuals", func = function() showHitboxes() end},
+    -- Tools
+    {name = "CopyPosition", desc = "Copy position to clipboard", category = "Utility", func = function() copyPosition() end, canFavorite = true},
+    {name = "BTools", desc = "Give building tools", category = "Utility", func = function() giveBTools() end, canFavorite = true},
+    {name = "ForceField", desc = "Apply force field", category = "Utility", func = function() applyForceField() end, canFavorite = true},
+    {name = "HighJump", desc = "Jump very high", category = "Character", func = function() doHighJump() end, canFavorite = true},
+    {name = "SwimMode", desc = "Swim in the air", category = "Character", func = function() toggleSwimMode() end, canFavorite = true},
+    
+    -- Visual commands
+    {name = "Rainbow", desc = "Rainbow character", category = "Visuals", func = function() makeRainbowCharacter() end, canFavorite = true},
+    {name = "ClearMap", desc = "Clear the map", category = "Visuals", func = function() clearMap() end, canFavorite = true},
+    {name = "LowGraphics", desc = "Low graphics settings", category = "Visuals", func = function() setLowGraphics() end, canFavorite = true},
+    {name = "RemoveTextures", desc = "Remove textures", category = "Visuals", func = function() removeTextures() end, canFavorite = true},
+    {name = "ShowHitboxes", desc = "Show hitboxes", category = "Visuals", func = function() showHitboxes() end, canFavorite = true},
+    
+    -- Special commands
+    {name = "InfiniteYield", desc = "Load Infinite Yield admin", category = "Utility", func = function() loadInfiniteYield() end, canFavorite = true},
+    {name = "AntiAFK", desc = "Prevent AFK kick", category = "Utility", func = function() enableAntiAFK() end, canFavorite = true},
+    {name = "FixCamera", desc = "Fix camera issues", category = "Utility", func = function() fixCamera() end, canFavorite = true}
 }
 
--- Kategoriler
+-- Categories
 local categories = {
+    "Favorites",
     "Main",
     "Character",
     "Combat",
-    "Vision",
+    "ESP",
+    "Teleport",
     "Players",
+    "Animations",
+    "Vision",
     "Utility",
     "Fun",
     "Visuals",
@@ -131,37 +197,37 @@ local categories = {
 }
 
 -- =====================
--- Fonksiyon Tanımları
+-- Function Definitions
 -- =====================
 
--- Yürüme hızını ayarla
+-- Set walk speed
 function setWalkSpeed(speed)
     if not player.Character or not player.Character:FindFirstChild("Humanoid") then return end
     player.Character.Humanoid.WalkSpeed = speed
     walkSpeed = speed
-    setStatus("Yürüme hızı " .. speed .. " olarak ayarlandı")
+    setStatus("Walk speed set to " .. speed)
 end
 
--- Zıplama gücünü ayarla
+-- Set jump power
 function setJumpPower(power)
     if not player.Character or not player.Character:FindFirstChild("Humanoid") then return end
     player.Character.Humanoid.JumpPower = power
     jumpPower = power
-    setStatus("Zıplama gücü " .. power .. " olarak ayarlandı")
+    setStatus("Jump power set to " .. power)
 end
 
--- Sonsuz zıplama
+-- Infinite jump
 function toggleInfiniteJump()
     infiniteJump = not infiniteJump
     
     if infiniteJump then
-        setStatus("Sonsuz zıplama aktif")
+        setStatus("Infinite jump enabled")
     else
-        setStatus("Sonsuz zıplama deaktif")
+        setStatus("Infinite jump disabled")
     end
 end
 
--- Noclip (duvarlardan geçme)
+-- Noclip (walk through walls)
 function toggleNoclip()
     noclip = not noclip
     
@@ -177,7 +243,7 @@ function toggleNoclip()
                 end
             end
         end)
-        setStatus("Noclip aktif")
+        setStatus("Noclip enabled")
     else
         if player.Character then
             for _, part in pairs(player.Character:GetDescendants()) do
@@ -186,22 +252,22 @@ function toggleNoclip()
                 end
             end
         end
-        setStatus("Noclip deaktif")
+        setStatus("Noclip disabled")
     end
 end
 
--- Uçma modu
+-- Fly mode
 function toggleFly()
     flying = not flying
     
     if flying then
-        -- Uçma kodunu başlat
+        -- Start fly code
         local flyPart = Instance.new("BodyVelocity")
         flyPart.Velocity = Vector3.new(0, 0, 0)
         flyPart.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
         flyPart.Name = "FlyPart"
         
-        -- Karakter hareketi
+        -- Character movement
         local controls = {
             f = false,
             b = false,
@@ -213,7 +279,7 @@ function toggleFly()
         
         local controlsChanged = {}
         
-        -- Klavye kontrolleri
+        -- Keyboard controls
         controlsChanged.w = UserInputService.InputBegan:Connect(function(input)
             if input.KeyCode == Enum.KeyCode.W then controls.f = true end
             if input.KeyCode == Enum.KeyCode.S then controls.b = true end
@@ -254,7 +320,7 @@ function toggleFly()
                 
                 local direction = Vector3.new(0, 0, 0)
                 
-                -- Kamera yönüne göre hareket
+                -- Move based on camera direction
                 local lookVector = camera.CFrame.LookVector
                 local rightVector = camera.CFrame.RightVector
                 
@@ -286,9 +352,9 @@ function toggleFly()
         end
         
         fly()
-        setStatus("Uçma modu aktif - WASDQE tuşlarını kullan")
+        setStatus("Fly mode enabled - Use WASDQE to move")
     else
-        -- Uçma modunu kapat
+        -- Disable fly mode
         if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             local flyPartInstance = player.Character.HumanoidRootPart:FindFirstChild("FlyPart")
             if flyPartInstance then
@@ -300,16 +366,16 @@ function toggleFly()
             player.Character.Humanoid.PlatformStand = false
         end
         
-        setStatus("Uçma modu deaktif")
+        setStatus("Fly mode disabled")
     end
 end
 
--- X-Ray (duvarları görme)
+-- X-Ray (see through walls)
 function toggleXRay()
     xray = not xray
     
     if xray then
-        -- Duvarların şeffaflığını ayarla
+        -- Make walls transparent
         for _, part in ipairs(Workspace:GetDescendants()) do
             if part:IsA("BasePart") and not part:IsDescendantOf(player.Character) and part.Transparency < 0.8 and not part:IsA("Terrain") then
                 if not part:FindFirstChild("OriginalTransparency") then
@@ -321,248 +387,539 @@ function toggleXRay()
                 part.Transparency = 0.8
             end
         end
-        setStatus("X-Ray aktif")
+        setStatus("X-Ray enabled")
     else
-        -- Duvarların şeffaflığını geri al
+        -- Restore wall transparency
         for _, part in ipairs(Workspace:GetDescendants()) do
             if part:IsA("BasePart") and part:FindFirstChild("OriginalTransparency") then
                 part.Transparency = part.OriginalTransparency.Value
                 part.OriginalTransparency:Destroy()
             end
         end
-        setStatus("X-Ray deaktif")
+        setStatus("X-Ray disabled")
     end
 end
 
--- ESP (oyuncuları ve nesneleri görme)
+-- Toggle specific ESP option
+function toggleESPOption(option)
+    if option == "boxes" then
+        esp.boxes = not esp.boxes
+        setStatus("ESP Boxes: " .. (esp.boxes and "Enabled" or "Disabled"))
+    elseif option == "names" then
+        esp.names = not esp.names
+        setStatus("ESP Names: " .. (esp.names and "Enabled" or "Disabled"))
+    elseif option == "tracers" then
+        esp.tracers = not esp.tracers
+        setStatus("ESP Tracers: " .. (esp.tracers and "Enabled" or "Disabled"))
+    elseif option == "teamCheck" then
+        esp.teamCheck = not esp.teamCheck
+        setStatus("ESP Team Check: " .. (esp.teamCheck and "Enabled" or "Disabled"))
+    elseif option == "teamColor" then
+        esp.teamColor = not esp.teamColor
+        setStatus("ESP Team Color: " .. (esp.teamColor and "Enabled" or "Disabled"))
+    elseif option == "chams" then
+        esp.chams = not esp.chams
+        setStatus("ESP Chams: " .. (esp.chams and "Enabled" or "Disabled"))
+        
+        -- Apply or remove chams
+        if esp.enabled then
+            updateESP()
+        end
+    end
+end
+
+-- ESP (see players and objects)
 function toggleESP()
-    esp = not esp
+    esp.enabled = not esp.enabled
     
-    if esp then
-        -- ESP kodunu başlat
-        local espLoop
-        espLoop = RunService.RenderStepped:Connect(function()
-            if not esp then 
-                espLoop:Disconnect()
-                -- Mevcut ESP öğelerini temizle
-                for _, player in ipairs(Players:GetPlayers()) do
-                    if player.Character then
-                        for _, part in ipairs(player.Character:GetDescendants()) do
-                            if part:IsA("BoxHandleAdornment") and part.Name == "ESPBox" then
-                                part:Destroy()
-                            end
-                        end
-                    end
-                end
-                return 
-            end
-            
-            -- Diğer oyuncular için ESP uygula
-            for _, otherPlayer in ipairs(Players:GetPlayers()) do
-                if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") and otherPlayer.Character:FindFirstChild("Humanoid") then
-                    -- Zaten ESP kutusu var mı kontrol et
-                    local hasESP = false
-                    for _, part in ipairs(otherPlayer.Character:GetDescendants()) do
-                        if part:IsA("BoxHandleAdornment") and part.Name == "ESPBox" then
-                            hasESP = true
-                            break
-                        end
-                    end
+    if esp.enabled then
+        -- Start ESP code
+        updateESP()
+        
+        -- Create update loop
+        if not getgenv().ESPUpdateLoop then
+            getgenv().ESPUpdateLoop = RunService.RenderStepped:Connect(function()
+                if not esp.enabled then
+                    getgenv().ESPUpdateLoop:Disconnect()
+                    getgenv().ESPUpdateLoop = nil
                     
-                    if not hasESP then
-                        -- Her oyuncu için ESP kutusu ekle
-                        for _, part in ipairs(otherPlayer.Character:GetDescendants()) do
-                            if part:IsA("BasePart") then
-                                local box = Instance.new("BoxHandleAdornment")
-                                box.Name = "ESPBox"
-                                box.Adornee = part
-                                box.AlwaysOnTop = true
-                                box.ZIndex = 10
-                                box.Size = part.Size
-                                box.Transparency = 0.5
-                                
-                                -- Takım renkleri
-                                if otherPlayer.Team and player.Team then
-                                    if otherPlayer.Team == player.Team then
-                                        box.Color3 = Color3.fromRGB(0, 255, 0) -- Yeşil (takım arkadaşı)
-                                    else
-                                        box.Color3 = Color3.fromRGB(255, 0, 0) -- Kırmızı (düşman)
-                                    end
-                                else
-                                    box.Color3 = Color3.fromRGB(255, 170, 0) -- Turuncu (nötr)
-                                end
-                                
-                                box.Parent = part
-                            end
-                        end
-                        
-                        -- Bilgi etiketini ekle
-                        local billboardGui = Instance.new("BillboardGui")
-                        billboardGui.Name = "ESPTag"
-                        billboardGui.Adornee = otherPlayer.Character.Head
-                        billboardGui.Size = UDim2.new(0, 100, 0, 40)
-                        billboardGui.StudsOffset = Vector3.new(0, 2, 0)
-                        billboardGui.AlwaysOnTop = true
-                        
-                        local nameLabel = Instance.new("TextLabel")
-                        nameLabel.BackgroundTransparency = 1
-                        nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
-                        nameLabel.Font = Enum.Font.GothamSemibold
-                        nameLabel.TextSize = 14
-                        nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-                        nameLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-                        nameLabel.TextStrokeTransparency = 0.3
-                        nameLabel.Text = otherPlayer.Name
-                        nameLabel.Parent = billboardGui
-                        
-                        local distanceLabel = Instance.new("TextLabel")
-                        distanceLabel.BackgroundTransparency = 1
-                        distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
-                        distanceLabel.Position = UDim2.new(0, 0, 0.5, 0)
-                        distanceLabel.Font = Enum.Font.Gotham
-                        distanceLabel.TextSize = 12
-                        distanceLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-                        distanceLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-                        distanceLabel.TextStrokeTransparency = 0.3
-                        distanceLabel.Parent = billboardGui
-                        
-                        billboardGui.Parent = otherPlayer.Character.Head
-                        
-                        -- Mesafe bilgisini güncelle
-                        local updateDistanceLoop
-                        updateDistanceLoop = RunService.Heartbeat:Connect(function()
-                            if otherPlayer.Character and player.Character and 
-                               otherPlayer.Character:FindFirstChild("HumanoidRootPart") and
-                               player.Character:FindFirstChild("HumanoidRootPart") then
-                                
-                                local distance = (otherPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                                distanceLabel.Text = string.format("%.0f studs", distance)
-                            else
-                                updateDistanceLoop:Disconnect()
-                            end
-                        end)
+                    -- Clean up ESP elements
+                    for _, plyr in ipairs(Players:GetPlayers()) do
+                        cleanupESP(plyr)
                     end
+                    return
                 end
-            end
-        end)
-        setStatus("ESP aktif")
+                
+                updateESP()
+            end)
+        end
+        
+        setStatus("ESP enabled")
     else
-        -- ESP kodunu devre dışı bırak, öğeleri temizle
+        -- Disable ESP code, clean up elements
+        if getgenv().ESPUpdateLoop then
+            getgenv().ESPUpdateLoop:Disconnect()
+            getgenv().ESPUpdateLoop = nil
+        end
+        
         for _, plyr in ipairs(Players:GetPlayers()) do
-            if plyr.Character then
-                for _, part in ipairs(plyr.Character:GetDescendants()) do
-                    if (part:IsA("BoxHandleAdornment") and part.Name == "ESPBox") or 
-                       (part:IsA("BillboardGui") and part.Name == "ESPTag") then
-                        part:Destroy()
-                    end
-                end
+            cleanupESP(plyr)
+        end
+        
+        setStatus("ESP disabled")
+    end
+end
+
+-- Clean up ESP for a player
+function cleanupESP(target)
+    if target.Character then
+        -- Remove ESP containers
+        for _, obj in ipairs(target.Character:GetChildren()) do
+            if obj.Name == "KILASIK_ESP_Container" then
+                obj:Destroy()
             end
         end
-        setStatus("ESP deaktif")
+        
+        -- Remove highlights
+        local highlight = target.Character:FindFirstChild("KILASIK_ESP_Highlight")
+        if highlight then
+            highlight:Destroy()
+        end
     end
 end
 
--- Aimbot (otomatik nişan alma)
-function toggleAimbot()
-    aimbotEnabled = not aimbotEnabled
+-- Update ESP elements
+function updateESP()
+    if not esp.enabled then return end
     
-    if aimbotEnabled then
-        local aimbotLoop
-        aimbotLoop = RunService.RenderStepped:Connect(function()
-            if not aimbotEnabled then 
-                aimbotLoop:Disconnect()
-                return 
+    -- Get all players
+    for _, otherPlayer in ipairs(Players:GetPlayers()) do
+        if otherPlayer ~= player and otherPlayer.Character and 
+           otherPlayer.Character:FindFirstChild("HumanoidRootPart") and 
+           otherPlayer.Character:FindFirstChild("Humanoid") and
+           otherPlayer.Character:FindFirstChild("Head") then
+            
+            -- Check team status if team check is enabled
+            local isFriendly = false
+            if esp.teamCheck and player.Team and otherPlayer.Team then
+                isFriendly = player.Team == otherPlayer.Team
             end
             
-            local closestPlayer = nil
-            local shortestDistance = math.huge
-            
-            -- En yakın oyuncuyu bul
-            for _, otherPlayer in ipairs(Players:GetPlayers()) do
-                if otherPlayer ~= player and otherPlayer.Character and
-                   otherPlayer.Character:FindFirstChild("Humanoid") and
-                   otherPlayer.Character.Humanoid.Health > 0 and
-                   otherPlayer.Character:FindFirstChild("HumanoidRootPart") and
-                   otherPlayer.Character:FindFirstChild("Head") then
-                    
-                    -- Ekranda göründüğünü kontrol et
+            if not esp.teamCheck or not isFriendly then
+                -- Determine color
+                local espColor = Color3.fromRGB(255, 0, 0) -- Enemy (red)
+                
+                if esp.teamColor and otherPlayer.Team then
+                    espColor = otherPlayer.TeamColor.Color
+                elseif isFriendly then
+                    espColor = Color3.fromRGB(0, 255, 0) -- Friendly (green)
+                end
+                
+                -- Create or update ESP container
+                local espContainer = otherPlayer.Character:FindFirstChild("KILASIK_ESP_Container")
+                if not espContainer then
+                    espContainer = Instance.new("Folder")
+                    espContainer.Name = "KILASIK_ESP_Container"
+                    espContainer.Parent = otherPlayer.Character
+                end
+                
+                -- Create chams (highlights)
+                if esp.chams then
+                    local highlight = otherPlayer.Character:FindFirstChild("KILASIK_ESP_Highlight")
+                    if not highlight then
+                        highlight = Instance.new("Highlight")
+                        highlight.Name = "KILASIK_ESP_Highlight"
+                        highlight.FillColor = espColor
+                        highlight.OutlineColor = espColor
+                        highlight.FillTransparency = 0.5
+                        highlight.OutlineTransparency = 0
+                        highlight.Parent = otherPlayer.Character
+                    else
+                        highlight.FillColor = espColor
+                        highlight.OutlineColor = espColor
+                    end
+                else
+                    local highlight = otherPlayer.Character:FindFirstChild("KILASIK_ESP_Highlight")
+                    if highlight then
+                        highlight:Destroy()
+                    end
+                end
+                
+                -- Create box ESP
+                if esp.boxes then
+                    -- Calculate 3D bounding box
+                    local hrp = otherPlayer.Character.HumanoidRootPart
                     local head = otherPlayer.Character.Head
-                    local headPosition = head.Position
-                    local screenPoint = camera:WorldToScreenPoint(headPosition)
+                    local rootPos = hrp.Position
+                    local headPos = head.Position
+                    local height = (headPos - rootPos).Magnitude * 2
+                    local width = height * 0.5
                     
-                    if screenPoint.Z > 0 then
-                        local vector = Vector2.new(screenPoint.X - mouse.X, screenPoint.Y - mouse.Y)
-                        local distance = vector.Magnitude
+                    -- Create or update box
+                    local boxESP = espContainer:FindFirstChild("BoxESP")
+                    if not boxESP then
+                        boxESP = Instance.new("BoxHandleAdornment")
+                        boxESP.Name = "BoxESP"
+                        boxESP.Adornee = hrp
+                        boxESP.AlwaysOnTop = true
+                        boxESP.ZIndex = 10
+                        boxESP.Color3 = espColor
+                        boxESP.Transparency = 0.7
+                        boxESP.Parent = espContainer
+                    end
+                    
+                    boxESP.Size = Vector3.new(width, height, width)
+                    boxESP.Color3 = espColor
+                else
+                    local boxESP = espContainer:FindFirstChild("BoxESP")
+                    if boxESP then
+                        boxESP:Destroy()
+                    end
+                end
+                
+                -- Create name ESP
+                if esp.names then
+                    local nameESP = espContainer:FindFirstChild("NameESP")
+                    if not nameESP then
+                        nameESP = Instance.new("BillboardGui")
+                        nameESP.Name = "NameESP"
+                        nameESP.AlwaysOnTop = true
+                        nameESP.Size = UDim2.new(0, 200, 0, 50)
+                        nameESP.StudsOffset = Vector3.new(0, 3, 0)
                         
-                        -- Ekranın merkezine en yakın oyuncuyu seç
-                        if distance < shortestDistance then
-                            shortestDistance = distance
-                            closestPlayer = otherPlayer
+                        local nameLabel = Instance.new("TextLabel")
+                        nameLabel.Name = "NameLabel"
+                        nameLabel.BackgroundTransparency = 1
+                        nameLabel.Size = UDim2.new(1, 0, 1, 0)
+                        nameLabel.Font = Enum.Font.SourceSansBold
+                        nameLabel.TextSize = 20
+                        nameLabel.TextColor3 = espColor
+                        nameLabel.TextStrokeTransparency = 0.5
+                        nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+                        nameLabel.Parent = nameESP
+                        
+                        nameESP.Adornee = otherPlayer.Character.Head
+                        nameESP.Parent = espContainer
+                    end
+                    
+                    -- Update name and distance
+                    local nameLabel = nameESP:FindFirstChild("NameLabel")
+                    if nameLabel then
+                        local distance = (otherPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                        nameLabel.Text = otherPlayer.Name .. " [" .. math.floor(distance) .. "m]"
+                        nameLabel.TextColor3 = espColor
+                    end
+                else
+                    local nameESP = espContainer:FindFirstChild("NameESP")
+                    if nameESP then
+                        nameESP:Destroy()
+                    end
+                end
+                
+                -- Create tracers
+                if esp.tracers then
+                    local tracerESP = espContainer:FindFirstChild("TracerESP")
+                    if not tracerESP then
+                        tracerESP = Instance.new("LineHandleAdornment")
+                        tracerESP.Name = "TracerESP"
+                        tracerESP.AlwaysOnTop = true
+                        tracerESP.ZIndex = 10
+                        tracerESP.Color3 = espColor
+                        tracerESP.Transparency = 0.7
+                        tracerESP.Thickness = 1
+                        tracerESP.Parent = espContainer
+                    end
+                    
+                    -- Set tracer from bottom of screen to player
+                    local screenSize = camera.ViewportSize
+                    local screenCenter = Vector2.new(screenSize.X/2, screenSize.Y)
+                    
+                    tracerESP.Adornee = otherPlayer.Character.HumanoidRootPart
+                    tracerESP.Length = 1000
+                    tracerESP.Color3 = espColor
+                else
+                    local tracerESP = espContainer:FindFirstChild("TracerESP")
+                    if tracerESP then
+                        tracerESP:Destroy()
+                    end
+                end
+            else
+                -- Player is friendly and team check is on, remove ESP
+                cleanupESP(otherPlayer)
+            end
+        end
+    end
+end
+
+-- Show Aimbot settings
+function showAimbotSettings()
+    -- This would create a settings menu, but for now we'll just toggle these options
+    aimbotSettings.teamCheck = not aimbotSettings.teamCheck
+    setStatus("Aimbot Team Check: " .. (aimbotSettings.teamCheck and "Enabled" or "Disabled"))
+end
+
+-- Set aimbot FOV size
+function setAimbotFOV(size)
+    aimbotSettings.fovSize = size
+    setStatus("Aimbot FOV size set to: " .. size)
+    
+    -- Update FOV circle if it exists
+    if aimbotSettings.enabled and aimbotSettings.showFOV then
+        local fovcircle = Drawing.new("Circle")
+        fovcircle.Visible = true
+        fovcircle.Radius = size
+        fovcircle.Thickness = 1
+        fovcircle.Transparency = 1
+        fovcircle.Color = Color3.fromRGB(255, 255, 255)
+        fovcircle.Position = camera.ViewportSize / 2
+        
+        -- Store it in the settings
+        if getgenv().FOVCircle then
+            getgenv().FOVCircle:Remove()
+        end
+        getgenv().FOVCircle = fovcircle
+    end
+end
+
+-- Toggle wallbang
+function toggleWallbang()
+    aimbotSettings.wallbangEnabled = not aimbotSettings.wallbangEnabled
+    setStatus("Wallbang: " .. (aimbotSettings.wallbangEnabled and "Enabled" or "Disabled"))
+end
+
+-- Aimbot (auto aim)
+function toggleAimbot()
+    aimbotSettings.enabled = not aimbotSettings.enabled
+    
+    if aimbotSettings.enabled then
+        -- Create FOV circle if showing
+        if aimbotSettings.showFOV then
+            local fovcircle = Drawing.new("Circle")
+            fovcircle.Visible = true
+            fovcircle.Radius = aimbotSettings.fovSize
+            fovcircle.Thickness = 1
+            fovcircle.Transparency = 1
+            fovcircle.Color = Color3.fromRGB(255, 255, 255)
+            fovcircle.Position = camera.ViewportSize / 2
+            
+            -- Store it for later updates
+            if getgenv().FOVCircle then
+                getgenv().FOVCircle:Remove()
+            end
+            getgenv().FOVCircle = fovcircle
+        end
+        
+        -- Create aimbot update loop
+        if not getgenv().AimbotUpdateLoop then
+            getgenv().AimbotUpdateLoop = RunService.RenderStepped:Connect(function()
+                if not aimbotSettings.enabled then
+                    getgenv().AimbotUpdateLoop:Disconnect()
+                    getgenv().AimbotUpdateLoop = nil
+                    
+                    -- Remove FOV circle
+                    if getgenv().FOVCircle then
+                        getgenv().FOVCircle:Remove()
+                        getgenv().FOVCircle = nil
+                    end
+                    return
+                end
+                
+                -- Update FOV circle position
+                if getgenv().FOVCircle then
+                    getgenv().FOVCircle.Position = camera.ViewportSize / 2
+                end
+                
+                -- Check for right mouse button (or whatever key is set)
+                local isKeyDown = false
+                if aimbotSettings.toggleKey == "RightMouse" then
+                    isKeyDown = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+                else
+                    isKeyDown = UserInputService:IsKeyDown(Enum.KeyCode[aimbotSettings.toggleKey])
+                end
+                
+                if not isKeyDown then
+                    aimbotTarget = nil
+                    return
+                end
+                
+                -- Find closest player within FOV
+                local closestPlayer = nil
+                local closestDistance = math.huge
+                local screenCenter = camera.ViewportSize / 2
+                
+                for _, otherPlayer in ipairs(Players:GetPlayers()) do
+                    if otherPlayer ~= player and otherPlayer.Character and 
+                       otherPlayer.Character:FindFirstChild("Humanoid") and 
+                       otherPlayer.Character.Humanoid.Health > 0 and
+                       otherPlayer.Character:FindFirstChild(aimbotSettings.aimPart) then
+                        
+                        -- Check team if team check enabled
+                        if aimbotSettings.teamCheck and player.Team and otherPlayer.Team and player.Team == otherPlayer.Team then
+                            continue
+                        end
+                        
+                        -- Check if target is visible if visibility check enabled
+                        if aimbotSettings.visibilityCheck and not isTargetVisible(otherPlayer.Character, aimbotSettings.aimPart) then
+                            continue
+                        end
+                        
+                        -- Check if target is within FOV
+                        local targetPart = otherPlayer.Character[aimbotSettings.aimPart]
+                        local screenPoint = camera:WorldToScreenPoint(targetPart.Position)
+                        
+                        if screenPoint.Z > 0 then
+                            local screenDistance = (Vector2.new(screenPoint.X, screenPoint.Y) - screenCenter).Magnitude
+                            
+                            if screenDistance <= aimbotSettings.fovSize then
+                                if screenDistance < closestDistance then
+                                    closestDistance = screenDistance
+                                    closestPlayer = otherPlayer
+                                end
+                            end
                         end
                     end
                 end
-            end
-            
-            -- En yakın oyuncuya bak
-            if closestPlayer and shortestDistance < 300 then
-                aimbotTarget = closestPlayer
-                camera.CFrame = CFrame.new(camera.CFrame.Position, closestPlayer.Character.Head.Position)
-            else
-                aimbotTarget = nil
-            end
-        end)
-        setStatus("Aimbot aktif")
+                
+                -- Aim at the closest player
+                if closestPlayer then
+                    aimbotTarget = closestPlayer
+                    local targetPart = closestPlayer.Character[aimbotSettings.aimPart]
+                    
+                    -- Calculate aim point, adding a bit of smoothing
+                    local targetPos = targetPart.Position
+                    local aimPos = camera.CFrame.Position + (targetPos - camera.CFrame.Position).Unit * 1000
+                    
+                    -- Apply smoothing
+                    local currentAim = camera.CFrame.LookVector
+                    local targetAim = (targetPos - camera.CFrame.Position).Unit
+                    local smoothedAim = currentAim:Lerp(targetAim, aimbotSettings.sensitivity)
+                    
+                    -- Set camera to look at target
+                    camera.CFrame = CFrame.new(camera.CFrame.Position, camera.CFrame.Position + smoothedAim * 1000)
+                else
+                    aimbotTarget = nil
+                end
+            end)
+        end
+        
+        setStatus("Aimbot enabled - Right click to activate")
     else
         aimbotTarget = nil
-        setStatus("Aimbot deaktif")
+        
+        -- Cleanup
+        if getgenv().AimbotUpdateLoop then
+            getgenv().AimbotUpdateLoop:Disconnect()
+            getgenv().AimbotUpdateLoop = nil
+        end
+        
+        if getgenv().FOVCircle then
+            getgenv().FOVCircle:Remove()
+            getgenv().FOVCircle = nil
+        end
+        
+        setStatus("Aimbot disabled")
     end
 end
 
--- Fare konumuna ışınlanma
+-- Check if a target is visible (for aimbot)
+function isTargetVisible(character, partName)
+    if not character or not character:FindFirstChild(partName) or not player.Character or not player.Character:FindFirstChild("Head") then
+        return false
+    end
+    
+    local targetPart = character[partName]
+    local origin = player.Character.Head.Position
+    local direction = (targetPart.Position - origin).Unit
+    local distance = (targetPart.Position - origin).Magnitude
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = {player.Character}
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    
+    local raycastResult = workspace:Raycast(origin, direction * distance, raycastParams)
+    
+    if raycastResult then
+        return raycastResult.Instance:IsDescendantOf(character)
+    end
+    
+    return true
+end
+
+-- Toggle click teleport
+function toggleClickTP()
+    local clickTPEnabled = not getgenv().ClickTPEnabled
+    
+    if clickTPEnabled then
+        if not getgenv().ClickTPConnection then
+            getgenv().ClickTPConnection = mouse.Button1Down:Connect(function()
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+                    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                        player.Character.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 5, 0))
+                    end
+                end
+            end)
+        end
+        setStatus("Click Teleport enabled - Ctrl+Click to teleport")
+    else
+        if getgenv().ClickTPConnection then
+            getgenv().ClickTPConnection:Disconnect()
+            getgenv().ClickTPConnection = nil
+        end
+        setStatus("Click Teleport disabled")
+    end
+    
+    getgenv().ClickTPEnabled = clickTPEnabled
+end
+
+-- Teleport to mouse position
 function teleportToMouse()
     local mousePos = mouse.Hit.Position
     if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         player.Character.HumanoidRootPart.CFrame = CFrame.new(mousePos + Vector3.new(0, 5, 0))
-        setStatus("Fare konumuna ışınlandın")
+        setStatus("Teleported to mouse position")
     else
-        setStatus("Işınlanma başarısız: Karakter bulunamadı")
+        setStatus("Teleport failed: Character not found")
     end
 end
 
--- Oyuncuya ışınlanma
+-- Teleport to player
 function teleportToPlayer(targetName)
-    local targetPlayer = nil
-    
-    for _, plyr in ipairs(Players:GetPlayers()) do
-        if plyr.Name:lower():find(targetName:lower()) then
-            targetPlayer = plyr
-            break
-        end
-    end
+    local targetPlayer = getPlayerFromName(targetName)
     
     if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") and
        player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         player.Character.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 2)
-        setStatus(targetPlayer.Name .. " adlı oyuncuya ışınlandın")
+        setStatus("Teleported to " .. targetPlayer.Name)
     else
-        setStatus("Oyuncu bulunamadı veya ışınlanılamadı")
+        setStatus("Player not found or unreachable")
     end
 end
 
--- Sunucuya yeniden bağlan
+-- Get player from name (partial match)
+function getPlayerFromName(name)
+    name = name:lower()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Name:lower():find(name) then
+            return plr
+        end
+    end
+    return nil
+end
+
+-- Rejoin server
 function rejoinServer()
-    setStatus("Sunucuya yeniden bağlanılıyor...")
+    setStatus("Rejoining server...")
     TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId)
 end
 
--- Sisi kaldır
+-- Remove fog
 function removeFog()
     Lighting.FogStart = 100000
     Lighting.FogEnd = 100000
-    setStatus("Sis kaldırıldı")
+    setStatus("Fog removed")
 end
 
--- Tam aydınlatma
+-- Full brightness
 function enableFullBright()
     local oldAmbient = Lighting.Ambient
     Lighting.Ambient = Color3.fromRGB(255, 255, 255)
@@ -572,10 +929,10 @@ function enableFullBright()
     Lighting.GlobalShadows = false
     Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
     
-    setStatus("Tam aydınlatma etkinleştirildi")
+    setStatus("Full brightness enabled")
 end
 
--- Görünmezlik
+-- Invisibility
 function makeInvisible()
     if player.Character then
         for _, part in pairs(player.Character:GetDescendants()) do
@@ -583,11 +940,11 @@ function makeInvisible()
                 part.Transparency = 1
             end
         end
-        setStatus("Görünmezlik etkinleştirildi (yarı-görünmezlik)")
+        setStatus("Invisibility enabled (semi-invisible)")
     end
 end
 
--- Meshes'leri kaldır
+-- Remove meshes
 function removeMeshes()
     if player.Character then
         for _, part in pairs(player.Character:GetDescendants()) do
@@ -595,7 +952,7 @@ function removeMeshes()
                 part:Destroy()
             end
         end
-        setStatus("Mesh'ler kaldırıldı")
+        setStatus("Meshes removed")
     end
 end
 
@@ -604,9 +961,9 @@ function toggleKillAura()
     local killAuraEnabled = not (getgenv().KillAuraConnection ~= nil)
     
     if killAuraEnabled then
-        local range = 15 -- Vuruş menzili
+        local range = 15 -- Hit range
         
-        -- KillAura döngüsü
+        -- KillAura loop
         getgenv().KillAuraConnection = RunService.Heartbeat:Connect(function()
             for _, otherPlayer in ipairs(Players:GetPlayers()) do
                 if otherPlayer ~= player and otherPlayer.Character and player.Character and
@@ -615,33 +972,37 @@ function toggleKillAura()
                    otherPlayer.Character:FindFirstChild("HumanoidRootPart") and
                    player.Character:FindFirstChild("HumanoidRootPart") then
                     
+                    -- Check team if applicable
+                    if player.Team and otherPlayer.Team and player.Team == otherPlayer.Team then
+                        continue
+                    end
+                    
                     local distance = (otherPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
                     
                     if distance <= range then
-                        -- Silahı bul ve ateş et veya kılıcı bul ve vur
+                        -- Find weapon and hit or slash
                         for _, tool in pairs(player.Character:GetChildren()) do
                             if tool:IsA("Tool") and (tool:FindFirstChild("Handle") or tool:FindFirstChild("Blade")) then
-                                -- Remote event'i etkinleştir (oyunlar arasında değişebilir)
-                                local handlePart = tool:FindFirstChild("Handle") or tool:FindFirstChild("Blade")
+                                -- Try different methods to hit
                                 
-                                -- Yakındaki oyuncuya farklı yöntemlerle vurmayı dene 
-                                -- (Not: Bu her oyunda çalışmayabilir)
-                                
-                                -- Yöntem 1: Doğrudan vurma
+                                -- Method 1: Direct hit
                                 if tool.Name:lower():find("sword") or tool.Name:lower():find("knife") then
                                     tool:Activate()
-                                    -- Vuruş için silahı hedefle
-                                    handlePart.CFrame = otherPlayer.Character.HumanoidRootPart.CFrame
+                                    -- Target the hit
+                                    local handlePart = tool:FindFirstChild("Handle") or tool:FindFirstChild("Blade")
+                                    if handlePart then
+                                        handlePart.CFrame = otherPlayer.Character.HumanoidRootPart.CFrame
+                                    end
                                 end
                                 
-                                -- Yöntem 2: Remote event kullanma
+                                -- Method 2: Remote event
                                 for _, event in pairs(tool:GetDescendants()) do
                                     if event:IsA("RemoteEvent") and (event.Name:lower():find("hit") or event.Name:lower():find("damage")) then
                                         event:FireServer(otherPlayer.Character.HumanoidRootPart)
                                     end
                                 end
                                 
-                                -- Yöntem 3: Serverside olayını taklit etme
+                                -- Method 3: Try game-specific events
                                 for _, event in pairs(ReplicatedStorage:GetDescendants()) do
                                     if event:IsA("RemoteEvent") and (event.Name:lower():find("damage") or event.Name:lower():find("hit")) then
                                         event:FireServer(otherPlayer.Character.HumanoidRootPart)
@@ -654,18 +1015,18 @@ function toggleKillAura()
             end
         end)
         
-        setStatus("KillAura aktif - 15 birim menzilli")
+        setStatus("KillAura enabled - 15 stud range")
     else
         if getgenv().KillAuraConnection then
             getgenv().KillAuraConnection:Disconnect()
             getgenv().KillAuraConnection = nil
         end
         
-        setStatus("KillAura deaktif")
+        setStatus("KillAura disabled")
     end
 end
 
--- Sonsuz mermi
+-- Infinite ammo
 function giveInfiniteAmmo()
     local gunHook
     gunHook = hookmetamethod(game, "__namecall", function(self, ...)
@@ -673,20 +1034,20 @@ function giveInfiniteAmmo()
         local method = getnamecallmethod()
         
         if method == "FireServer" and self.Name:lower():find("ammo") or self.Name:lower():find("bullet") then
-            -- Mermi sayısı hook'u
+            -- Ammo count hook
             return
         end
         
         return gunHook(self, ...)
     end)
     
-    setStatus("Sonsuz mermi aktifleştirildi (bazı oyunlarda çalışmayabilir)")
+    setStatus("Infinite ammo activated (may not work in all games)")
 end
 
--- God Mode (ölümsüzlük modu)
+-- God Mode (attempt)
 function attemptGodMode()
     if player.Character and player.Character:FindFirstChild("Humanoid") then
-        -- Yöntem 1: Humanoid verilerini kopyala
+        -- Method 1: Clone Humanoid
         local humanoid = player.Character.Humanoid
         local cloneHum = humanoid:Clone()
         humanoid.Name = "1"
@@ -694,10 +1055,10 @@ function attemptGodMode()
         humanoid:Destroy()
         cloneHum.Name = "Humanoid"
         
-        -- Yöntem 2: BreakJoints ataklarını engelle
+        -- Method 2: Prevent joint breaks
         player.Character.Humanoid.BreakJointsOnDeath = false
         
-        -- Yöntem 3: Health degerini koru
+        -- Method 3: Hook health
         local healthHook
         healthHook = hookmetamethod(game, "__index", function(self, key)
             if self == player.Character.Humanoid and key == "Health" then
@@ -706,16 +1067,16 @@ function attemptGodMode()
             return healthHook(self, key)
         end)
         
-        setStatus("God Mode aktifleştirilmeye çalışıldı (bazı oyunlarda çalışmayabilir)")
+        setStatus("God Mode attempted (may not work in all games)")
     end
 end
 
--- Otomatik Kaynak Toplama
+-- Auto farm
 function toggleAutoFarm()
     local autoFarmEnabled = not (getgenv().AutoFarmConnection ~= nil)
     
     if autoFarmEnabled then
-        -- Ortak kaynak isimlerini belirle
+        -- Common resource names
         local resourceNames = {
             "Coin", "Gem", "Diamond", "Cash", "Money", "Gold", "Silver", "Bronze",
             "Chest", "Crate", "Box", "Ore", "Resource", "Collectible", "Pickup",
@@ -729,14 +1090,14 @@ function toggleAutoFarm()
             
             local rootPart = player.Character.HumanoidRootPart
             local closestResource = nil
-            local shortestDistance = 50 -- Maksimum mesafe
+            local shortestDistance = 50 -- Max distance
             
-            -- İlk olarak workspace'de arama yap
+            -- First search workspace
             for _, child in ipairs(workspace:GetDescendants()) do
                 if child:IsA("BasePart") or child:IsA("Model") then
                     local isResource = false
                     
-                    -- İsim kontrolü
+                    -- Name check
                     for _, resourceName in ipairs(resourceNames) do
                         if child.Name:lower():find(resourceName:lower()) or 
                            (child.Parent and child.Parent.Name:lower():find(resourceName:lower())) then
@@ -745,7 +1106,7 @@ function toggleAutoFarm()
                         end
                     end
                     
-                    -- Fiziksel özellik kontrolü (pırıltı, dönme hareketi, vb.)
+                    -- Physical property check (shine, rotation, etc.)
                     if not isResource and child:IsA("BasePart") then
                         if child:FindFirstChildOfClass("ParticleEmitter") or
                            child:FindFirstChildOfClass("PointLight") or
@@ -753,11 +1114,11 @@ function toggleAutoFarm()
                             isResource = true
                         end
                         
-                        -- Renge göre de kontrol edebiliriz
+                        -- Also check by color
                         if not isResource and (
-                            child.BrickColor == BrickColor.new("Bright yellow") or -- Altın/Para rengi
-                            child.BrickColor == BrickColor.new("Bright blue") or   -- Değerli taş rengi
-                            child.BrickColor == BrickColor.new("New Yeller")       -- Para rengi
+                            child.BrickColor == BrickColor.new("Bright yellow") or -- Gold/Money color
+                            child.BrickColor == BrickColor.new("Bright blue") or   -- Gem color
+                            child.BrickColor == BrickColor.new("New Yeller")       -- Money color
                         ) then
                             isResource = true
                         end
@@ -775,25 +1136,24 @@ function toggleAutoFarm()
                 end
             end
             
-            -- Eğer bir kaynak bulunduysa otomatik topla
+            -- If a resource is found, auto collect
             if closestResource then
                 local targetPosition = closestResource:IsA("Model") and closestResource:GetModelCFrame().Position or closestResource.Position
                 
-                -- Kaynağa doğru hareket et
+                -- Move toward resource
                 player.Character.Humanoid:MoveTo(targetPosition)
                 
-                -- Çok yakınsa direk üzerine ışınlan (daha hızlı toplama için)
+                -- If very close, teleport directly onto it for faster collection
                 if shortestDistance < 10 then
                     rootPart.CFrame = CFrame.new(targetPosition)
                 end
                 
-                -- Kaynağın üzerine bas (remoteEvents ile etkileşimde bulun)
-                -- Touch interest sistemini tetikle
+                -- Trigger touch interest
                 firetouchinterest(rootPart, closestResource, 0)
                 wait(0.1)
                 firetouchinterest(rootPart, closestResource, 1)
                 
-                -- RemoteEvent'ler üzerinde deneme yap
+                -- Try remote events
                 for _, event in pairs(closestResource:GetDescendants()) do
                     if event:IsA("RemoteEvent") and (event.Name:lower():find("collect") or event.Name:lower():find("pickup") or event.Name:lower():find("grab")) then
                         event:FireServer()
@@ -802,18 +1162,18 @@ function toggleAutoFarm()
             end
         end)
         
-        setStatus("Otomatik kaynak toplama aktif")
+        setStatus("Auto farm enabled")
     else
         if getgenv().AutoFarmConnection then
             getgenv().AutoFarmConnection:Disconnect()
             getgenv().AutoFarmConnection = nil
         end
         
-        setStatus("Otomatik kaynak toplama devre dışı")
+        setStatus("Auto farm disabled")
     end
 end
 
--- Silah menzilini artır
+-- Increase weapon reach
 function increaseReach()
     local oldNamecall
     oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
@@ -821,17 +1181,17 @@ function increaseReach()
         local method = getnamecallmethod()
         
         if method == "FireServer" and string.find(self.Name:lower(), "hit") or string.find(self.Name:lower(), "damage") then
-            -- Argümanları kontrol et ve gerekirse değiştir
+            -- Check and modify arguments
             for i, v in pairs(args) do
                 if typeof(v) == "Vector3" then
-                    -- Menzili arttır
+                    -- Increase range
                     args[i] = player.Character.HumanoidRootPart.Position + (v - player.Character.HumanoidRootPart.Position).unit * 30
                 end
                 
                 if typeof(v) == "Instance" and v:IsA("BasePart") then
-                    -- En yakın oyuncuyu bul
+                    -- Find closest player
                     local closestPlayer = nil
-                    local shortestDistance = 20 -- Artırılmış menzil
+                    local shortestDistance = 20 -- Increased range
                     
                     for _, otherPlayer in ipairs(Players:GetPlayers()) do
                         if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -856,10 +1216,46 @@ function increaseReach()
         return oldNamecall(self, ...)
     end)
     
-    setStatus("Silah menzili artırıldı (bazı oyunlarda çalışmayabilir)")
+    setStatus("Weapon reach increased (may not work in all games)")
 end
 
--- Dans animasyonu oynat
+-- Play animation
+function playAnimation(animType)
+    if not player.Character or not player.Character:FindFirstChild("Humanoid") then
+        setStatus("Cannot play animation: character not found")
+        return
+    end
+    
+    local animations = {
+        zombie = "rbxassetid://616158929",
+        ninja = "rbxassetid://656117400",
+        robot = "rbxassetid://3716636869",
+        dab = "rbxassetid://3303391864",
+        floss = "rbxassetid://5917459365",
+        groove = "rbxassetid://3303391864",
+        lay = "rbxassetid://3152378852",
+        sit = "rbxassetid://2506281703",
+        superhero = "rbxassetid://616088887",
+        spin = "rbxassetid://188632011"
+    }
+    
+    local animId = animations[animType]
+    if not animId then
+        setStatus("Animation not found: " .. animType)
+        return
+    end
+    
+    -- Play the animation
+    local anim = Instance.new("Animation")
+    anim.AnimationId = animId
+    
+    local animTrack = player.Character.Humanoid:LoadAnimation(anim)
+    animTrack:Play()
+    
+    setStatus(animType .. " animation playing")
+end
+
+-- Dance animation
 function playDanceAnimation()
     local animations = {
         "rbxassetid://507771019", -- Shuffle
@@ -877,27 +1273,20 @@ function playDanceAnimation()
         local animTrack = player.Character.Humanoid:LoadAnimation(anim)
         animTrack:Play()
         
-        setStatus("Dans animasyonu oynatılıyor")
+        setStatus("Dance animation playing")
     end
 end
 
--- Sahte sohbet mesajı
+-- Fake chat message
 function fakeChatMessage(targetName, message)
-    local targetPlayer = nil
-    
-    for _, plyr in ipairs(Players:GetPlayers()) do
-        if plyr.Name:lower():find(targetName:lower()) then
-            targetPlayer = plyr
-            break
-        end
-    end
+    local targetPlayer = getPlayerFromName(targetName)
     
     if not targetPlayer then
-        setStatus("Oyuncu bulunamadı")
+        setStatus("Player not found")
         return
     end
     
-    -- Chat geçmişi arayüzünü bul
+    -- Find chat GUI
     local chatGui = nil
     
     for _, gui in ipairs(player.PlayerGui:GetChildren()) do
@@ -908,11 +1297,11 @@ function fakeChatMessage(targetName, message)
     end
     
     if not chatGui then
-        setStatus("Sohbet arayüzü bulunamadı")
+        setStatus("Chat interface not found")
         return
     end
     
-    -- Sahte mesaj oluştur
+    -- Create fake message
     local fakeMessageFrame = Instance.new("Frame")
     fakeMessageFrame.Size = UDim2.new(1, 0, 0, 20)
     fakeMessageFrame.BackgroundTransparency = 1
@@ -925,7 +1314,7 @@ function fakeChatMessage(targetName, message)
     fakeMessageText.TextXAlignment = Enum.TextXAlignment.Left
     fakeMessageText.TextColor3 = Color3.fromRGB(255, 255, 255)
     
-    -- Takım renklerine göre ayarla
+    -- Set team colors
     if targetPlayer.Team then
         fakeMessageText.TextColor3 = targetPlayer.TeamColor.Color
     end
@@ -933,7 +1322,7 @@ function fakeChatMessage(targetName, message)
     fakeMessageText.Text = targetPlayer.Name .. ": " .. message
     fakeMessageText.Parent = fakeMessageFrame
     
-    -- Mesajı chat geçmişine ekle
+    -- Add message to chat history
     for _, child in ipairs(chatGui:GetDescendants()) do
         if child:IsA("ScrollingFrame") and child.Name:lower():find("chat") or child.Name:lower():find("message") then
             fakeMessageFrame.Parent = child
@@ -941,15 +1330,15 @@ function fakeChatMessage(targetName, message)
         end
     end
     
-    setStatus("Sahte mesaj gönderildi")
+    setStatus("Fake message sent")
     
-    -- Bir süre sonra mesajı kaldır
+    -- Remove message after a while
     delay(10, function()
         fakeMessageFrame:Destroy()
     end)
 end
 
--- Dev karakter yap
+-- Make character giant
 function makeGiantSize()
     if player.Character then
         for _, part in pairs(player.Character:GetDescendants()) do
@@ -962,11 +1351,11 @@ function makeGiantSize()
             player.Character.Humanoid.HipHeight = player.Character.Humanoid.HipHeight * 3
         end
         
-        setStatus("Karakter büyütüldü")
+        setStatus("Character size increased")
     end
 end
 
--- Küçük karakter yap
+-- Make character tiny
 function makeTinySize()
     if player.Character then
         for _, part in pairs(player.Character:GetDescendants()) do
@@ -979,11 +1368,11 @@ function makeTinySize()
             player.Character.Humanoid.HipHeight = player.Character.Humanoid.HipHeight * 0.5
         end
         
-        setStatus("Karakter küçültüldü")
+        setStatus("Character size decreased")
     end
 end
 
--- Uçan parçalar oluştur
+-- Create floating parts
 function createFloatingParts()
     local parts = {}
     local colors = {
@@ -995,7 +1384,7 @@ function createFloatingParts()
         Color3.fromRGB(255, 0, 255)
     }
     
-    -- 20 parça oluştur
+    -- Create 20 parts
     for i = 1, 20 do
         local part = Instance.new("Part")
         part.Size = Vector3.new(1, 1, 1)
@@ -1009,7 +1398,7 @@ function createFloatingParts()
         table.insert(parts, part)
     end
     
-    -- Parçaları oyuncunun etrafında döndür
+    -- Orbit parts around player
     local angle = 0
     local radius = 5
     local angleStep = math.pi * 2 / #parts
@@ -1017,7 +1406,7 @@ function createFloatingParts()
     
     floatingLoop = RunService.Heartbeat:Connect(function()
         if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
-            -- Oyuncu karakteri kaybolursa parçaları temizle
+            -- Clean up if character disappears
             for _, part in ipairs(parts) do
                 part:Destroy()
             end
@@ -1036,7 +1425,7 @@ function createFloatingParts()
         end
     end)
     
-    -- 30 saniye sonra parçaları temizle
+    -- Clean up after 30 seconds
     delay(30, function()
         floatingLoop:Disconnect()
         for _, part in ipairs(parts) do
@@ -1044,13 +1433,13 @@ function createFloatingParts()
         end
     end)
     
-    setStatus("Uçan parçalar oluşturuldu (30 saniye)")
+    setStatus("Floating parts created (30 seconds)")
 end
 
--- Karakteri döndür
+-- Spin character
 function spinCharacter()
     if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        local spinSpeed = 10 -- dönüş hızı
+        local spinSpeed = 10 -- Spin speed
         local isSpinning = true
         
         local spinLoop
@@ -1063,68 +1452,66 @@ function spinCharacter()
             player.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(spinSpeed), 0)
         end)
         
-        -- 10 saniye sonra dönmeyi durdur
+        -- Stop spinning after 10 seconds
         delay(10, function()
             isSpinning = false
-            setStatus("Döndürme durduruldu")
+            setStatus("Spinning stopped")
         end)
         
-        setStatus("Karakter döndürülüyor (10 saniye)")
+        setStatus("Character spinning (10 seconds)")
     end
 end
 
--- Bir oyuncuyu izle
+-- Load Ultimate Fling script
+function loadUltimateFling()
+    setStatus("Loading Ultimate Fling...")
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/K1LAS1K/Ultimate-Fling-GUI/main/flingscript.lua"))()
+end
+
+-- Load Touch Fling script
+function loadTouchFling()
+    setStatus("Loading Touch Fling...")
+    loadstring(game:HttpGet('https://raw.githubusercontent.com/0Ben1/fe/main/obf_rf6iQURzu1fqrytcnLBAvW34C9N55kS9g9G3CKz086rC47M6632sEd4ZZYB0AYgV.lua.txt'))()
+end
+
+-- Spectate player
 function spectatePlayer(targetName)
-    local targetPlayer = nil
-    
-    for _, plyr in ipairs(Players:GetPlayers()) do
-        if plyr.Name:lower():find(targetName:lower()) then
-            targetPlayer = plyr
-            break
-        end
-    end
+    local targetPlayer = getPlayerFromName(targetName)
     
     if targetPlayer and targetPlayer.Character then
         workspace.CurrentCamera.CameraSubject = targetPlayer.Character.Humanoid
-        setStatus(targetPlayer.Name .. " adlı oyuncu izleniyor")
+        setStatus("Spectating " .. targetPlayer.Name)
     else
-        setStatus("Oyuncu bulunamadı")
+        setStatus("Player not found")
     end
 end
 
--- İzlemeyi durdur
+-- Stop spectating
 function unspectatePlayer()
     if player.Character and player.Character:FindFirstChild("Humanoid") then
         workspace.CurrentCamera.CameraSubject = player.Character.Humanoid
-        setStatus("İzleme modu kapatıldı")
+        setStatus("Spectating stopped")
     end
 end
 
--- Oyuncuya git
+-- Go to player
 function goToPlayer(targetName)
-    teleportToPlayer(targetName) -- Aynı fonksiyonu kullan
+    teleportToPlayer(targetName) -- Use the same function
 end
 
--- Oyuncuyu kendine getir
+-- Bring player
 function bringPlayer(targetName)
-    local targetPlayer = nil
-    
-    for _, plyr in ipairs(Players:GetPlayers()) do
-        if plyr.Name:lower():find(targetName:lower()) then
-            targetPlayer = plyr
-            break
-        end
-    end
+    local targetPlayer = getPlayerFromName(targetName)
     
     if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") and
        player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         
-        -- Not: Bu fonksiyon çoğu oyunda çalışmaz - oyunlar arası koruma vardır
+        -- Note: This function won't work in most games - cross-game protection
         
-        -- Yöntem 1: Pozisyonu değiştirmeyi dene
+        -- Method 1: Try to change position
         targetPlayer.Character.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
         
-        -- Yöntem 2: Uzaktan etkilemeyi dene
+        -- Method 2: Try network ownership
         if targetPlayer.Character:FindFirstChildOfClass("Tool") then
             local tool = targetPlayer.Character:FindFirstChildOfClass("Tool")
             local handle = tool:FindFirstChild("Handle")
@@ -1134,50 +1521,43 @@ function bringPlayer(targetName)
             end
         end
         
-        setStatus("Oyuncuyu getirme denendi (çoğu oyunda çalışmaz)")
+        setStatus("Attempted to bring player (may not work in most games)")
     else
-        setStatus("Oyuncu bulunamadı veya getirilemedi")
+        setStatus("Player not found or unreachable")
     end
 end
 
--- Oyuncuyu fırlat
+-- Fling player
 function flingPlayer(targetName)
-    local targetPlayer = nil
-    
-    for _, plyr in ipairs(Players:GetPlayers()) do
-        if plyr.Name:lower():find(targetName:lower()) then
-            targetPlayer = plyr
-            break
-        end
-    end
+    local targetPlayer = getPlayerFromName(targetName)
     
     if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") and
        player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         
-        -- Not: Bu fonksiyon çoğu oyunda çalışmaz - oyunlar arası koruma vardır
+        -- Note: This function won't work in most games - cross-game protection
         
-        -- Konumu sakla
+        -- Save position
         local oldPos = player.Character.HumanoidRootPart.CFrame
         
-        -- Karakter hızını artır
+        -- Increase character speed
         player.Character.Humanoid.WalkSpeed = 100
         
-        -- Hedef oyuncuya doğru koş
+        -- Run toward target player
         player.Character.Humanoid:MoveTo(targetPlayer.Character.HumanoidRootPart.Position)
         
-        -- Çarpma etkisini artır
+        -- Increase impact
         local bodyVelocity = Instance.new("BodyVelocity")
         bodyVelocity.Velocity = Vector3.new(0, 0, 0)
         bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
         bodyVelocity.P = math.huge
         bodyVelocity.Parent = player.Character.HumanoidRootPart
         
-        -- Bekle ve çarpışmadan hemen sonra çarpışmayı artır
+        -- Wait and increase impact right after collision
         delay(0.5, function()
             bodyVelocity.Velocity = player.Character.HumanoidRootPart.CFrame.LookVector * 500
             bodyVelocity.Parent = targetPlayer.Character.HumanoidRootPart
             
-            -- 1 saniye sonra temizle ve eski konuma dön
+            -- Clean up after 1 second and return to original position
             delay(1, function()
                 bodyVelocity:Destroy()
                 player.Character.HumanoidRootPart.CFrame = oldPos
@@ -1185,26 +1565,26 @@ function flingPlayer(targetName)
             end)
         end)
         
-        setStatus("Oyuncuyu fırlatma denendi (çoğu oyunda çalışmaz)")
+        setStatus("Attempted to fling player (may not work in most games)")
     else
-        setStatus("Oyuncu bulunamadı veya fırlatılamadı")
+        setStatus("Player not found or unflingable")
     end
 end
 
--- Pozisyonu kopyala
+-- Copy position
 function copyPosition()
     if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local position = player.Character.HumanoidRootPart.Position
         local posText = "Vector3.new(" .. tostring(position.X) .. ", " .. tostring(position.Y) .. ", " .. tostring(position.Z) .. ")"
         
         setclipboard(posText)
-        setStatus("Pozisyon kopyalandı: " .. posText)
+        setStatus("Position copied: " .. posText)
     else
-        setStatus("Pozisyon kopyalanamadı")
+        setStatus("Position copy failed")
     end
 end
 
--- BTools ver
+-- Give building tools
 function giveBTools()
     local toolNames = {"Move", "Clone", "Delete", "Grab"}
     
@@ -1215,58 +1595,58 @@ function giveBTools()
         tool.Parent = player.Backpack
     end
     
-    setStatus("BTools verildi")
+    setStatus("Building tools given")
 end
 
--- Koruyucu kalkan
+-- Apply force field
 function applyForceField()
     if player.Character then
         local forceField = Instance.new("ForceField")
         forceField.Parent = player.Character
         
-        setStatus("Koruyucu kalkan etkinleştirildi")
+        setStatus("Force field applied")
     end
 end
 
--- Yüksek zıplama
+-- High jump
 function doHighJump()
     if player.Character and player.Character:FindFirstChild("Humanoid") and player.Character:FindFirstChild("HumanoidRootPart") then
         local jumpForce = 100
         
-        -- Yerden zıpladığını kontrol et
+        -- Check if on ground
         local isOnGround = player.Character.Humanoid:GetState() == Enum.HumanoidStateType.Running or
                            player.Character.Humanoid:GetState() == Enum.HumanoidStateType.RunningNoPhysics
         
         if isOnGround then
-            -- Yukarı doğru güç uygulamak için BodyVelocity kullan
+            -- Apply upward force with BodyVelocity
             local bodyVelocity = Instance.new("BodyVelocity")
             bodyVelocity.Velocity = Vector3.new(0, jumpForce, 0)
             bodyVelocity.MaxForce = Vector3.new(0, math.huge, 0)
             bodyVelocity.Parent = player.Character.HumanoidRootPart
             
-            -- 0.2 saniye sonra temizle
+            -- Clean up after 0.2 seconds
             delay(0.2, function()
                 bodyVelocity:Destroy()
             end)
             
-            setStatus("Yüksek zıplama gerçekleştirildi")
+            setStatus("High jump executed")
         else
-            setStatus("Zıplama için yerde olmalısın")
+            setStatus("You must be on the ground to jump")
         end
     end
 end
 
--- Havada yüzme modu
+-- Swimming mode
 function toggleSwimMode()
     local swimModeEnabled = not (getgenv().SwimModeConnection ~= nil)
     
     if swimModeEnabled then
         getgenv().SwimModeConnection = RunService.Heartbeat:Connect(function()
             if player.Character and player.Character:FindFirstChild("Humanoid") then
-                -- Humanoid state'i yüzme olarak ayarla
+                -- Set humanoid state to swimming
                 player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Swimming)
                 
-                -- WASD tuşlarıyla 3 boyutlu hareket
+                -- 3D movement with WASD
                 local moveDirection = player.Character.Humanoid.MoveDirection
                 
                 if moveDirection.Magnitude > 0 then
@@ -1281,23 +1661,23 @@ function toggleSwimMode()
             end
         end)
         
-        setStatus("Havada yüzme modu aktif")
+        setStatus("Swim mode enabled")
     else
         if getgenv().SwimModeConnection then
             getgenv().SwimModeConnection:Disconnect()
             getgenv().SwimModeConnection = nil
         end
         
-        -- Karakterin normal durumuna dön
+        -- Return character to normal state
         if player.Character and player.Character:FindFirstChild("Humanoid") then
             player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
         end
         
-        setStatus("Havada yüzme modu devre dışı")
+        setStatus("Swim mode disabled")
     end
 end
 
--- Gökkuşağı karakter
+-- Rainbow character
 function makeRainbowCharacter()
     if player.Character then
         local rainbowSpeed = 2
@@ -1320,19 +1700,19 @@ function makeRainbowCharacter()
             end
         end)
         
-        -- 30 saniye sonra devre dışı bırak
+        -- Disable after 30 seconds
         delay(30, function()
             rainbowLoop:Disconnect()
-            setStatus("Gökkuşağı efekti sonlandırıldı")
+            setStatus("Rainbow effect ended")
         end)
         
-        setStatus("Gökkuşağı karakter efekti uygulandı (30 saniye)")
+        setStatus("Rainbow character effect applied (30 seconds)")
     end
 end
 
--- Haritayı temizle (zararlı olabilir!)
+-- Clear map (potentially harmful!)
 function clearMap()
-    -- Oyuncu ve oyun mekanikleri güvenliği için neleri koruyacağımızı belirle
+    -- Define what to protect for player and game mechanics safety
     local protectedNames = {
         "Workspace", "Camera", "Terrain", "SpawnLocation", "Players", "Script", "LocalScript", "StarterPack",
         "StarterGui", "StarterPlayer", "TouchTransmitter"
@@ -1348,7 +1728,7 @@ function clearMap()
     end
     
     local removedCount = 0
-    local maxRemove = 100 -- Oyunu çökertmemek için güvenlik sınırı
+    local maxRemove = 100 -- Safety limit to prevent crashing
     
     for _, obj in ipairs(workspace:GetDescendants()) do
         if not isProtected(obj) and obj:IsA("BasePart") and obj.Anchored then
@@ -1362,30 +1742,30 @@ function clearMap()
         end
     end
     
-    setStatus("Haritadaki " .. removedCount .. " öğe gizlendi (şeffaf yapıldı)")
+    setStatus("Hid " .. removedCount .. " map objects (made transparent)")
 end
 
--- Düşük grafik ayarları
+-- Low graphics settings
 function setLowGraphics()
-    -- Grafik kalitesini düşür
+    -- Lower graphics quality
     settings().Rendering.QualityLevel = 1
     
-    -- Shadows, efektler ve parçacıkları kapat
+    -- Disable shadows and effects
     game:GetService("Lighting").GlobalShadows = false
     game:GetService("Lighting").ShadowSoftness = 0
     
-    -- FPS sınırını kaldır
+    -- Uncap FPS
     setfpscap(9999)
     
-    -- Görüş mesafesini azalt
+    -- Reduce render distance
     settings().Rendering.EagerBulkExecution = false
     
-    -- Eşyaları daha basitleştir
+    -- Simplify objects
     for _, part in ipairs(workspace:GetDescendants()) do
         if part:IsA("BasePart") then
             part.Material = Enum.Material.SmoothPlastic
             
-            -- Özel efektleri kaldır
+            -- Remove special effects
             for _, child in ipairs(part:GetChildren()) do
                 if child:IsA("ParticleEmitter") or child:IsA("Trail") or child:IsA("Smoke") or child:IsA("Fire") then
                     child.Enabled = false
@@ -1394,16 +1774,16 @@ function setLowGraphics()
         end
     end
     
-    setStatus("Düşük grafik ayarları uygulandı")
+    setStatus("Low graphics settings applied")
 end
 
--- Dokuları kaldır
+-- Remove textures
 function removeTextures()
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") then
             obj.Material = Enum.Material.SmoothPlastic
             
-            -- Decal, Texture ve diğer görsel öğeleri kaldır
+            -- Remove Decal, Texture and other visual elements
             for _, child in ipairs(obj:GetChildren()) do
                 if child:IsA("Decal") or child:IsA("Texture") then
                     child.Transparency = 1
@@ -1412,17 +1792,17 @@ function removeTextures()
         end
     end
     
-    setStatus("Dokular kaldırıldı")
+    setStatus("Textures removed")
 end
 
--- Vuruş kutularını göster
+-- Show hitboxes
 function showHitboxes()
     local hitboxesEnabled = not (getgenv().HitboxConnection ~= nil)
     
     if hitboxesEnabled then
         local hitboxes = {}
         
-        -- Diğer oyuncular için hitbox oluştur
+        -- Create hitboxes for other players
         for _, otherPlayer in ipairs(Players:GetPlayers()) do
             if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
                 for _, part in ipairs(otherPlayer.Character:GetDescendants()) do
@@ -1443,11 +1823,11 @@ function showHitboxes()
             end
         end
         
-        -- Güncelleme döngüsü oluştur
+        -- Create update loop
         getgenv().HitboxConnection = RunService.Heartbeat:Connect(function()
             for _, otherPlayer in ipairs(Players:GetPlayers()) do
                 if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    -- Karakter parçalarındaki hitbox'ları kontrol et
+                    -- Check character parts for hitboxes
                     for _, part in ipairs(otherPlayer.Character:GetDescendants()) do
                         if part:IsA("BasePart") and not part:FindFirstChild("Hitbox") then
                             local hitbox = Instance.new("BoxHandleAdornment")
@@ -1467,14 +1847,14 @@ function showHitboxes()
             end
         end)
         
-        setStatus("Vuruş kutuları gösteriliyor")
+        setStatus("Hitboxes visible")
     else
         if getgenv().HitboxConnection then
             getgenv().HitboxConnection:Disconnect()
             getgenv().HitboxConnection = nil
         end
         
-        -- Tüm hitbox'ları temizle
+        -- Clean up all hitboxes
         for _, plyr in ipairs(Players:GetPlayers()) do
             if plyr.Character then
                 for _, part in ipairs(plyr.Character:GetDescendants()) do
@@ -1485,31 +1865,119 @@ function showHitboxes()
             end
         end
         
-        setStatus("Vuruş kutuları gizlendi")
+        setStatus("Hitboxes hidden")
+    end
+end
+
+-- Load Infinite Yield
+function loadInfiniteYield()
+    setStatus("Loading Infinite Yield admin...")
+    loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+end
+
+-- Anti AFK
+function enableAntiAFK()
+    local VirtualUser = game:GetService("VirtualUser")
+    
+    -- When the game detects AFK, simulate user input
+    player.Idled:Connect(function()
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
+        setStatus("Anti-AFK: Prevented kick")
+    end)
+    
+    setStatus("Anti-AFK enabled")
+end
+
+-- Fix camera issues
+function fixCamera()
+    -- Reset camera to default
+    workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+    workspace.CurrentCamera.CameraSubject = player.Character.Humanoid
+    
+    -- Fix camera orientation
+    workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, player.Character.HumanoidRootPart.Position)
+    
+    setStatus("Camera fixed")
+end
+
+-- Toggle a command as favorite
+function toggleFavorite(commandName)
+    local index = nil
+    
+    -- Check if already in favorites
+    for i, favCommand in ipairs(favoriteCommands) do
+        if favCommand == commandName then
+            index = i
+            break
+        end
+    end
+    
+    if index then
+        -- Remove from favorites
+        table.remove(favoriteCommands, index)
+        setStatus(commandName .. " removed from favorites")
+    else
+        -- Add to favorites
+        table.insert(favoriteCommands, commandName)
+        setStatus(commandName .. " added to favorites")
+    end
+    
+    -- Save favorites
+    if writefile then
+        writefile("KILASIK_favorites.json", HttpService:JSONEncode(favoriteCommands))
+    end
+    
+    -- Update favorites tab
+    if activeTab == "Favorites" then
+        updateCommandList("")
+    end
+end
+
+-- Check if command is favorited
+function isCommandFavorite(commandName)
+    for _, favCommand in ipairs(favoriteCommands) do
+        if favCommand == commandName then
+            return true
+        end
+    end
+    return false
+end
+
+-- Load favorites
+function loadFavorites()
+    if readfile and isfile and isfile("KILASIK_favorites.json") then
+        local success, result = pcall(function()
+            return HttpService:JSONDecode(readfile("KILASIK_favorites.json"))
+        end)
+        
+        if success and typeof(result) == "table" then
+            favoriteCommands = result
+        end
     end
 end
 
 -- =====================
--- GUI Oluşturma
+-- GUI Creation
 -- =====================
 
--- Status metni gösterme
+-- Show status message
 local statusLabel = nil
 function setStatus(text)
     if not statusLabel then return end
     statusLabel.Text = text
     
     delay(5, function()
-        -- 5 saniye sonra metni sıfırla
+        -- Reset text after 5 seconds
         if statusLabel and statusLabel.Text == text then
-            statusLabel.Text = "Hazır"
+            statusLabel.Text = "Ready"
         end
     end)
 end
 
--- Key doğrulama GUI'si
+-- Key verification GUI
 function createKeyVerificationGUI()
-    -- CoreGui kullanma denemesi yap (bazı executor'lar izin vermez)
+    -- Try to use CoreGui (some executors won't allow)
     local container = nil
     pcall(function()
         container = game:GetService("CoreGui")
@@ -1519,17 +1987,17 @@ function createKeyVerificationGUI()
         container = player.PlayerGui
     end
     
-    -- Ana GUI oluştur
+    -- Main GUI
     local keyGUI = Instance.new("ScreenGui")
-    keyGUI.Name = "KilasikKeyVerification"
+    keyGUI.Name = "KILASIK_KeyVerification"
     keyGUI.ResetOnSpawn = false
     keyGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     keyGUI.Parent = container
     
-    -- Arkaplan
+    -- Background
     local background = Instance.new("Frame")
-    background.Size = UDim2.new(0, 350, 0, 200)
-    background.Position = UDim2.new(0.5, -175, 0.5, -100)
+    background.Size = UDim2.new(0, 350, 0, 250)
+    background.Position = UDim2.new(0.5, -175, 0.5, -125)
     background.BackgroundColor3 = colors.background
     background.BorderSizePixel = 0
     background.Parent = keyGUI
@@ -1538,12 +2006,12 @@ function createKeyVerificationGUI()
     uiCorner.CornerRadius = UDim.new(0, 10)
     uiCorner.Parent = background
     
-    -- Başlık
+    -- Title
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(1, 0, 0, 40)
     title.BackgroundColor3 = colors.header
     title.BorderSizePixel = 0
-    title.Text = "KİLASİK GUI - Key Doğrulama"
+    title.Text = "KILASIK GUI - Key Verification"
     title.Font = Enum.Font.GothamBold
     title.TextSize = 18
     title.TextColor3 = colors.text
@@ -1561,24 +2029,24 @@ function createKeyVerificationGUI()
     titleCoverBar.ZIndex = 0
     titleCoverBar.Parent = title
     
-    -- Açıklama
+    -- Description
     local description = Instance.new("TextLabel")
     description.Size = UDim2.new(1, -40, 0, 40)
     description.Position = UDim2.new(0, 20, 0, 50)
     description.BackgroundTransparency = 1
-    description.Text = "Bu GUI'yi kullanmak için geçerli bir key girmeniz gerekiyor."
+    description.Text = "You need a valid key to use this GUI."
     description.Font = Enum.Font.Gotham
     description.TextSize = 14
     description.TextWrapped = true
     description.TextColor3 = colors.text
     description.Parent = background
     
-    -- Input kutusu
+    -- Input box
     local inputBox = Instance.new("TextBox")
     inputBox.Size = UDim2.new(1, -40, 0, 35)
     inputBox.Position = UDim2.new(0, 20, 0, 95)
     inputBox.BackgroundColor3 = colors.neutralDark
-    inputBox.PlaceholderText = "Key'i buraya girin..."
+    inputBox.PlaceholderText = "Enter key here..."
     inputBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
     inputBox.Text = ""
     inputBox.Font = Enum.Font.Gotham
@@ -1592,12 +2060,29 @@ function createKeyVerificationGUI()
     inputBoxCorner.CornerRadius = UDim.new(0, 6)
     inputBoxCorner.Parent = inputBox
     
-    -- Doğrulama butonu
+    -- Discord button
+    local discordButton = Instance.new("TextButton")
+    discordButton.Size = UDim2.new(1, -40, 0, 35)
+    discordButton.Position = UDim2.new(0, 20, 0, 140)
+    discordButton.BackgroundColor3 = Color3.fromRGB(114, 137, 218) -- Discord color
+    discordButton.Text = "Get Key from Discord"
+    discordButton.Font = Enum.Font.GothamBold
+    discordButton.TextSize = 14
+    discordButton.TextColor3 = colors.text
+    discordButton.BorderSizePixel = 0
+    discordButton.AutoButtonColor = false
+    discordButton.Parent = background
+    
+    local discordCorner = Instance.new("UICorner")
+    discordCorner.CornerRadius = UDim.new(0, 6)
+    discordCorner.Parent = discordButton
+    
+    -- Verify button
     local verifyButton = Instance.new("TextButton")
-    verifyButton.Size = UDim2.new(0, 150, 0, 35)
-    verifyButton.Position = UDim2.new(0.5, -75, 0, 145)
+    verifyButton.Size = UDim2.new(1, -40, 0, 35)
+    verifyButton.Position = UDim2.new(0, 20, 0, 185)
     verifyButton.BackgroundColor3 = colors.highlight
-    verifyButton.Text = "Doğrula"
+    verifyButton.Text = "Verify"
     verifyButton.Font = Enum.Font.GothamBold
     verifyButton.TextSize = 16
     verifyButton.TextColor3 = colors.text
@@ -1609,10 +2094,10 @@ function createKeyVerificationGUI()
     verifyButtonCorner.CornerRadius = UDim.new(0, 6)
     verifyButtonCorner.Parent = verifyButton
     
-    -- Sonuç etiketi
+    -- Result label
     local resultLabel = Instance.new("TextLabel")
     resultLabel.Size = UDim2.new(1, -40, 0, 20)
-    resultLabel.Position = UDim2.new(0, 20, 0, 185)
+    resultLabel.Position = UDim2.new(0, 20, 0, 230)
     resultLabel.BackgroundTransparency = 1
     resultLabel.Text = ""
     resultLabel.Font = Enum.Font.Gotham
@@ -1620,7 +2105,15 @@ function createKeyVerificationGUI()
     resultLabel.TextColor3 = colors.warning
     resultLabel.Parent = background
     
-    -- Buton hover efekti
+    -- Button hover effects
+    discordButton.MouseEnter:Connect(function()
+        discordButton.BackgroundColor3 = Color3.fromRGB(130, 150, 230) -- Lighter Discord color
+    end)
+    
+    discordButton.MouseLeave:Connect(function()
+        discordButton.BackgroundColor3 = Color3.fromRGB(114, 137, 218)
+    end)
+    
     verifyButton.MouseEnter:Connect(function()
         verifyButton.BackgroundColor3 = Color3.fromRGB(90, 150, 200)
     end)
@@ -1629,26 +2122,33 @@ function createKeyVerificationGUI()
         verifyButton.BackgroundColor3 = colors.highlight
     end)
     
-    -- Key doğrulama fonksiyonu
+    -- Discord button function
+    discordButton.MouseButton1Click:Connect(function()
+        setclipboard(DISCORD_LINK)
+        resultLabel.Text = "Discord link copied to clipboard!"
+        resultLabel.TextColor3 = colors.success
+    end)
+    
+    -- Key verification function
     verifyButton.MouseButton1Click:Connect(function()
         local inputKey = inputBox.Text
         
         if inputKey == KEY_CODE then
-            resultLabel.Text = "Key doğrulandı! GUI yükleniyor..."
+            resultLabel.Text = "Key verified! Loading GUI..."
             resultLabel.TextColor3 = colors.success
             
             keyVerified = true
             
-            -- GUI'yi yükle
+            -- Load GUI
             delay(1, function()
                 keyGUI:Destroy()
                 createMainGUI()
             end)
         else
-            resultLabel.Text = "Geçersiz key! Lütfen tekrar deneyin."
+            resultLabel.Text = "Invalid key! Please try again."
             resultLabel.TextColor3 = colors.warning
             
-            -- Hata efekti
+            -- Error effect
             local originalColor = inputBox.BackgroundColor3
             inputBox.BackgroundColor3 = colors.warning
             delay(0.5, function()
@@ -1660,11 +2160,11 @@ function createKeyVerificationGUI()
     return keyGUI
 end
 
--- Ana GUI'yi oluştur
+-- Create main GUI
 function createMainGUI()
     if guiCreated then return end
     
-    -- CoreGui kullanma denemesi yap (bazı executor'lar izin vermez)
+    -- Try to use CoreGui
     local container = nil
     pcall(function()
         container = game:GetService("CoreGui")
@@ -1674,14 +2174,17 @@ function createMainGUI()
         container = player.PlayerGui
     end
     
-    -- Ana GUI oluştur
+    -- Try to load favorites
+    loadFavorites()
+    
+    -- Main GUI
     local mainGUI = Instance.new("ScreenGui")
-    mainGUI.Name = "KilasikGUI"
+    mainGUI.Name = "KILASIKGUI"
     mainGUI.ResetOnSpawn = false
     mainGUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     mainGUI.Parent = container
     
-    -- Ana çerçeve
+    -- Main frame
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
     mainFrame.Size = UDim2.new(0, 550, 0, 350)
@@ -1696,7 +2199,7 @@ function createMainGUI()
     mainCorner.CornerRadius = UDim.new(0, 10)
     mainCorner.Parent = mainFrame
     
-    -- Başlık çubuğu
+    -- Title bar
     local titleBar = Instance.new("Frame")
     titleBar.Name = "TitleBar"
     titleBar.Size = UDim2.new(1, 0, 0, 40)
@@ -1716,19 +2219,19 @@ function createMainGUI()
     titleCoverBar.ZIndex = 0
     titleCoverBar.Parent = titleBar
     
-    -- Başlık metni
+    -- Title text
     local titleText = Instance.new("TextLabel")
-    titleText.Size = UDim2.new(1, -100, 1, 0)
+    titleText.Size = UDim2.new(1, -150, 1, 0)
     titleText.Position = UDim2.new(0, 15, 0, 0)
     titleText.BackgroundTransparency = 1
-    titleText.Text = "KİLASİK GUI"
+    titleText.Text = "KILASIK GUI"
     titleText.Font = Enum.Font.GothamBold
     titleText.TextSize = 18
     titleText.TextColor3 = colors.text
     titleText.TextXAlignment = Enum.TextXAlignment.Left
     titleText.Parent = titleBar
     
-    -- Kapat butonu
+    -- Close button
     local closeButton = Instance.new("TextButton")
     closeButton.Size = UDim2.new(0, 30, 0, 30)
     closeButton.Position = UDim2.new(1, -35, 0, 5)
@@ -1745,7 +2248,7 @@ function createMainGUI()
     closeCorner.CornerRadius = UDim.new(0, 6)
     closeCorner.Parent = closeButton
     
-    -- Minimize butonu
+    -- Minimize button
     local minimizeButton = Instance.new("TextButton")
     minimizeButton.Size = UDim2.new(0, 30, 0, 30)
     minimizeButton.Position = UDim2.new(1, -70, 0, 5)
@@ -1762,7 +2265,24 @@ function createMainGUI()
     minimizeCorner.CornerRadius = UDim.new(0, 6)
     minimizeCorner.Parent = minimizeButton
     
-    -- Kategori sekmesi
+    -- Mini button (logo mode)
+    local miniButton = Instance.new("TextButton")
+    miniButton.Size = UDim2.new(0, 30, 0, 30)
+    miniButton.Position = UDim2.new(1, -105, 0, 5)
+    miniButton.BackgroundColor3 = colors.neutralLight
+    miniButton.Text = "□"
+    miniButton.Font = Enum.Font.GothamBold
+    miniButton.TextSize = 16
+    miniButton.TextColor3 = colors.text
+    miniButton.BorderSizePixel = 0
+    miniButton.AutoButtonColor = false
+    miniButton.Parent = titleBar
+    
+    local miniCorner = Instance.new("UICorner")
+    miniCorner.CornerRadius = UDim.new(0, 6)
+    miniCorner.Parent = miniButton
+    
+    -- Category tab
     local categoryFrame = Instance.new("Frame")
     categoryFrame.Name = "CategoryFrame"
     categoryFrame.Size = UDim2.new(0, 130, 1, -40)
@@ -1773,7 +2293,7 @@ function createMainGUI()
     
     local categoryButtons = {}
     
-    -- Kategori butonları
+    -- Category buttons
     for i, category in ipairs(categories) do
         local categoryButton = Instance.new("TextButton")
         categoryButton.Name = category .. "Button"
@@ -1792,35 +2312,60 @@ function createMainGUI()
         categoryCorner.CornerRadius = UDim.new(0, 6)
         categoryCorner.Parent = categoryButton
         
-        -- Hover efekti
+        -- Special color for favorites tab
+        if category == "Favorites" then
+            categoryButton.BackgroundColor3 = category == activeTab and colors.buttonSelected or colors.favorite
+            categoryButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+        end
+        
+        -- Hover effect
         categoryButton.MouseEnter:Connect(function()
             if activeTab ~= category then
-                categoryButton.BackgroundColor3 = colors.buttonHover
+                if category == "Favorites" then
+                    categoryButton.BackgroundColor3 = Color3.fromRGB(255, 235, 100) -- Lighter gold
+                else
+                    categoryButton.BackgroundColor3 = colors.buttonHover
+                end
             end
         end)
         
         categoryButton.MouseLeave:Connect(function()
             if activeTab ~= category then
-                categoryButton.BackgroundColor3 = colors.button
+                if category == "Favorites" then
+                    categoryButton.BackgroundColor3 = colors.favorite
+                else
+                    categoryButton.BackgroundColor3 = colors.button
+                end
             end
         end)
         
-        -- Tıklama fonksiyonu
+        -- Click function
         categoryButton.MouseButton1Click:Connect(function()
-            -- Aktif sekmeyi değiştir
+            -- Change active tab
             if activeTab ~= category then
-                -- Önceki butonun rengini sıfırla
+                -- Reset previous button color
                 for _, btn in pairs(categoryButtons) do
-                    btn.BackgroundColor3 = colors.button
+                    if btn.Text == "Favorites" then
+                        btn.BackgroundColor3 = colors.favorite
+                        btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+                    else
+                        btn.BackgroundColor3 = colors.button
+                        btn.TextColor3 = colors.text
+                    end
                 end
                 
-                -- Yeni butonun rengini değiştir
+                -- Set new button color
                 categoryButton.BackgroundColor3 = colors.buttonSelected
+                if category == "Favorites" then
+                    categoryButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+                else
+                    categoryButton.TextColor3 = colors.text
+                end
                 
-                -- Aktif sekmeyi güncelle
+                -- Update active tab
                 activeTab = category
                 
-                -- İçerik panelini güncelle
+                -- Update content panel
                 updateContentPanel()
             end
         end)
@@ -1828,7 +2373,7 @@ function createMainGUI()
         categoryButtons[category] = categoryButton
     end
     
-    -- İçerik paneli
+    -- Content panel
     local contentFrame = Instance.new("Frame")
     contentFrame.Name = "ContentFrame"
     contentFrame.Size = UDim2.new(1, -140, 1, -90)
@@ -1837,13 +2382,13 @@ function createMainGUI()
     contentFrame.BorderSizePixel = 0
     contentFrame.Parent = mainFrame
     
-    -- Arama çubuğu
+    -- Search bar
     local searchBar = Instance.new("TextBox")
     searchBar.Name = "SearchBar"
     searchBar.Size = UDim2.new(1, -15, 0, 35)
     searchBar.Position = UDim2.new(0, 5, 0, 5)
     searchBar.BackgroundColor3 = colors.neutralDark
-    searchBar.PlaceholderText = "Komut ara..."
+    searchBar.PlaceholderText = "Search commands..."
     searchBar.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
     searchBar.Text = ""
     searchBar.Font = Enum.Font.Gotham
@@ -1857,7 +2402,7 @@ function createMainGUI()
     searchBarCorner.CornerRadius = UDim.new(0, 6)
     searchBarCorner.Parent = searchBar
     
-    -- Komut listesi
+    -- Command list
     local commandList = Instance.new("ScrollingFrame")
     commandList.Name = "CommandList"
     commandList.Size = UDim2.new(1, -10, 1, -50)
@@ -1866,15 +2411,15 @@ function createMainGUI()
     commandList.BorderSizePixel = 0
     commandList.ScrollBarThickness = 6
     commandList.ScrollBarImageColor3 = colors.neutralLight
-    commandList.CanvasSize = UDim2.new(0, 0, 0, 0) -- Otomatik ayarlanacak
+    commandList.CanvasSize = UDim2.new(0, 0, 0, 0) -- Will be auto-adjusted
     commandList.Parent = contentFrame
     
-    -- Liste düzeni
+    -- List layout
     local listLayout = Instance.new("UIListLayout")
     listLayout.Padding = UDim.new(0, 5)
     listLayout.Parent = commandList
     
-    -- Durum çubuğu
+    -- Status bar
     local statusBar = Instance.new("Frame")
     statusBar.Name = "StatusBar"
     statusBar.Size = UDim2.new(1, -135, 0, 30)
@@ -1887,31 +2432,56 @@ function createMainGUI()
     statusCorner.CornerRadius = UDim.new(0, 6)
     statusCorner.Parent = statusBar
     
-    -- Durum metni
+    -- Status text
     statusLabel = Instance.new("TextLabel")
     statusLabel.Size = UDim2.new(1, -20, 1, 0)
     statusLabel.Position = UDim2.new(0, 10, 0, 0)
     statusLabel.BackgroundTransparency = 1
-    statusLabel.Text = "Hazır"
+    statusLabel.Text = "Ready"
     statusLabel.Font = Enum.Font.Gotham
     statusLabel.TextSize = 14
     statusLabel.TextColor3 = colors.text
     statusLabel.TextXAlignment = Enum.TextXAlignment.Left
     statusLabel.Parent = statusBar
     
-    -- Kredi etiketi
+    -- Credit label
     local creditLabel = Instance.new("TextLabel")
     creditLabel.Size = UDim2.new(0, 130, 0, 30)
     creditLabel.Position = UDim2.new(0, 0, 1, -30)
     creditLabel.BackgroundColor3 = colors.categoryBG
-    creditLabel.Text = "KİLASİK"
+    creditLabel.Text = "KILASIK"
     creditLabel.Font = Enum.Font.GothamBold
     creditLabel.TextSize = 14
-    creditLabel.TextColor3 = Color3.fromRGB(255, 215, 0) -- Altın rengi
+    creditLabel.TextColor3 = Color3.fromRGB(255, 215, 0) -- Gold color
     creditLabel.BorderSizePixel = 0
     creditLabel.Parent = mainFrame
     
-    -- Hover ve Tıklama Efektleri
+    -- Mini logo (for mini mode)
+    local miniLogo = Instance.new("Frame")
+    miniLogo.Name = "MiniLogo"
+    miniLogo.Size = UDim2.new(0, 60, 0, 60)
+    miniLogo.Position = UDim2.new(0, 10, 0, 10)
+    miniLogo.BackgroundColor3 = colors.header
+    miniLogo.Visible = false
+    miniLogo.BorderSizePixel = 0
+    miniLogo.Active = true
+    miniLogo.Draggable = true
+    miniLogo.Parent = mainGUI
+    
+    local miniLogoCorner = Instance.new("UICorner")
+    miniLogoCorner.CornerRadius = UDim.new(1, 0) -- Circle
+    miniLogoCorner.Parent = miniLogo
+    
+    local miniLogoText = Instance.new("TextLabel")
+    miniLogoText.Size = UDim2.new(1, 0, 1, 0)
+    miniLogoText.BackgroundTransparency = 1
+    miniLogoText.Text = "K"
+    miniLogoText.Font = Enum.Font.GothamBold
+    miniLogoText.TextSize = 30
+    miniLogoText.TextColor3 = Color3.fromRGB(255, 215, 0) -- Gold
+    miniLogoText.Parent = miniLogo
+    
+    -- Hover and Click Effects
     closeButton.MouseEnter:Connect(function()
         closeButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
     end)
@@ -1928,13 +2498,20 @@ function createMainGUI()
         minimizeButton.BackgroundColor3 = colors.neutralLight
     end)
     
-    -- Buton işlevleri
+    miniButton.MouseEnter:Connect(function()
+        miniButton.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+    end)
+    
+    miniButton.MouseLeave:Connect(function()
+        miniButton.BackgroundColor3 = colors.neutralLight
+    end)
+    
+    -- Button functions
     closeButton.MouseButton1Click:Connect(function()
         mainGUI:Destroy()
         guiCreated = false
     end)
     
-    local minimized = false
     minimizeButton.MouseButton1Click:Connect(function()
         minimized = not minimized
         
@@ -1953,126 +2530,197 @@ function createMainGUI()
         end
     end)
     
-    -- Arama fonksiyonu
+    miniButton.MouseButton1Click:Connect(function()
+        miniSize = not miniSize
+        
+        if miniSize then
+            -- Switch to mini logo
+            mainFrame.Visible = false
+            miniLogo.Visible = true
+        else
+            -- Switch back to full GUI
+            mainFrame.Visible = true
+            miniLogo.Visible = false
+        end
+    end)
+    
+    -- Mini logo click behavior
+    miniLogo.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            miniSize = false
+            mainFrame.Visible = true
+            miniLogo.Visible = false
+        end
+    end)
+    
+    -- Search function
     searchBar.Changed:Connect(function(prop)
         if prop == "Text" then
             updateCommandList(searchBar.Text)
         end
     end)
     
-    -- İçerik panelini güncelleme fonksiyonu
+    -- Update content panel function
     function updateContentPanel()
         updateCommandList(searchBar.Text)
     end
     
-    -- Komut listesini güncelleme fonksiyonu
+    -- Update command list function
     function updateCommandList(searchQuery)
-        -- Listeyi temizle
+        -- Clear list
         for _, child in pairs(commandList:GetChildren()) do
             if child:IsA("Frame") then
                 child:Destroy()
             end
         end
         
-        -- Yeni komutları ekle
+        -- Add new commands
         local yOffset = 0
         local buttonHeight = 40
         
-        for _, cmd in ipairs(commands) do
-            -- Ana kategori sekmesi ya da arama sorgusuna uyan komutları göster
-            if (activeTab == "Main" or cmd.category == activeTab) and 
-               (searchQuery == "" or string.find(string.lower(cmd.name), string.lower(searchQuery)) or 
-                string.find(string.lower(cmd.desc), string.lower(searchQuery))) then
-                
-                -- Komut butonu
-                local commandButton = Instance.new("Frame")
-                commandButton.Name = cmd.name .. "Button"
-                commandButton.Size = UDim2.new(1, -10, 0, buttonHeight)
-                commandButton.BackgroundColor3 = colors.button
-                commandButton.BorderSizePixel = 0
-                commandButton.Parent = commandList
-                
-                local commandCorner = Instance.new("UICorner")
-                commandCorner.CornerRadius = UDim.new(0, 6)
-                commandCorner.Parent = commandButton
-                
-                -- Komut adı
-                local nameLabel = Instance.new("TextLabel")
-                nameLabel.Size = UDim2.new(0.4, -10, 1, 0)
-                nameLabel.Position = UDim2.new(0, 10, 0, 0)
-                nameLabel.BackgroundTransparency = 1
-                nameLabel.Text = cmd.name
-                nameLabel.Font = Enum.Font.GothamSemibold
-                nameLabel.TextSize = 14
-                nameLabel.TextColor3 = colors.text
-                nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-                nameLabel.Parent = commandButton
-                
-                -- Komut açıklaması
-                local descLabel = Instance.new("TextLabel")
-                descLabel.Size = UDim2.new(0.6, -10, 1, 0)
-                descLabel.Position = UDim2.new(0.4, 0, 0, 0)
-                descLabel.BackgroundTransparency = 1
-                descLabel.Text = cmd.desc
-                descLabel.Font = Enum.Font.Gotham
-                descLabel.TextSize = 12
-                descLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-                descLabel.TextXAlignment = Enum.TextXAlignment.Left
-                descLabel.TextWrapped = true
-                descLabel.Parent = commandButton
-                
-                -- Arka plan buton
-                local clickButton = Instance.new("TextButton")
-                clickButton.Size = UDim2.new(1, 0, 1, 0)
-                clickButton.BackgroundTransparency = 1
-                clickButton.Text = ""
-                clickButton.ZIndex = 10
-                clickButton.Parent = commandButton
-                
-                -- Buton hover efekti
-                clickButton.MouseEnter:Connect(function()
-                    commandButton.BackgroundColor3 = colors.buttonHover
-                end)
-                
-                clickButton.MouseLeave:Connect(function()
-                    commandButton.BackgroundColor3 = colors.button
-                end)
-                
-                -- Tıklama fonksiyonu
-                clickButton.MouseButton1Click:Connect(function()
-                    -- Komutu çalıştır
-                    if cmd.func then
-                        cmd.func()
-                    end
-                    
-                    -- Buton basma efekti
-                    commandButton.BackgroundColor3 = colors.buttonSelected
-                    wait(0.1)
-                    commandButton.BackgroundColor3 = colors.button
-                end)
-                
-                yOffset = yOffset + buttonHeight + 5
+        -- Determine which commands to show
+        local commandsToShow = {}
+        
+        if activeTab == "Favorites" then
+            -- Show only favorite commands
+            for _, cmd in ipairs(commands) do
+                if isCommandFavorite(cmd.name) then
+                    table.insert(commandsToShow, cmd)
+                end
+            end
+        else
+            -- Show commands based on category and search
+            for _, cmd in ipairs(commands) do
+                if (activeTab == "Main" or cmd.category == activeTab) and 
+                   (searchQuery == "" or string.find(string.lower(cmd.name), string.lower(searchQuery)) or 
+                    string.find(string.lower(cmd.desc), string.lower(searchQuery))) then
+                    table.insert(commandsToShow, cmd)
+                end
             end
         end
         
-        -- Canvas boyutunu ayarla
+        -- Sort alphabetically
+        table.sort(commandsToShow, function(a, b)
+            return a.name < b.name
+        end)
+        
+        -- Create buttons for each command
+        for _, cmd in ipairs(commandsToShow) do
+            -- Command button
+            local commandButton = Instance.new("Frame")
+            commandButton.Name = cmd.name .. "Button"
+            commandButton.Size = UDim2.new(1, -10, 0, buttonHeight)
+            commandButton.BackgroundColor3 = colors.button
+            commandButton.BorderSizePixel = 0
+            commandButton.Parent = commandList
+            
+            local commandCorner = Instance.new("UICorner")
+            commandCorner.CornerRadius = UDim.new(0, 6)
+            commandCorner.Parent = commandButton
+            
+            -- Command name
+            local nameLabel = Instance.new("TextLabel")
+            nameLabel.Size = UDim2.new(0.4, -10, 1, 0)
+            nameLabel.Position = UDim2.new(0, 10, 0, 0)
+            nameLabel.BackgroundTransparency = 1
+            nameLabel.Text = cmd.name
+            nameLabel.Font = Enum.Font.GothamSemibold
+            nameLabel.TextSize = 14
+            nameLabel.TextColor3 = colors.text
+            nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+            nameLabel.Parent = commandButton
+            
+            -- Command description
+            local descLabel = Instance.new("TextLabel")
+            descLabel.Size = UDim2.new(0.6, -35, 1, 0)
+            descLabel.Position = UDim2.new(0.4, 0, 0, 0)
+            descLabel.BackgroundTransparency = 1
+            descLabel.Text = cmd.desc
+            descLabel.Font = Enum.Font.Gotham
+            descLabel.TextSize = 12
+            descLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+            descLabel.TextXAlignment = Enum.TextXAlignment.Left
+            descLabel.TextWrapped = true
+            descLabel.Parent = commandButton
+            
+            -- Background button
+            local clickButton = Instance.new("TextButton")
+            clickButton.Size = UDim2.new(1, 0, 1, 0)
+            clickButton.BackgroundTransparency = 1
+            clickButton.Text = ""
+            clickButton.ZIndex = 10
+            clickButton.Parent = commandButton
+            
+            -- Favorite button (star)
+            if cmd.canFavorite then
+                local favButton = Instance.new("TextButton")
+                favButton.Size = UDim2.new(0, 25, 0, 25)
+                favButton.Position = UDim2.new(1, -30, 0.5, -12.5)
+                favButton.BackgroundTransparency = 1
+                favButton.Text = "★"
+                favButton.Font = Enum.Font.GothamBold
+                favButton.TextSize = 18
+                favButton.TextColor3 = isCommandFavorite(cmd.name) and colors.favorite or Color3.fromRGB(120, 120, 120)
+                favButton.Parent = commandButton
+                
+                -- Favorite click function
+                favButton.MouseButton1Click:Connect(function()
+                    toggleFavorite(cmd.name)
+                    favButton.TextColor3 = isCommandFavorite(cmd.name) and colors.favorite or Color3.fromRGB(120, 120, 120)
+                end)
+            end
+            
+            -- Button hover effect
+            clickButton.MouseEnter:Connect(function()
+                commandButton.BackgroundColor3 = colors.buttonHover
+            end)
+            
+            clickButton.MouseLeave:Connect(function()
+                commandButton.BackgroundColor3 = colors.button
+            end)
+            
+            -- Click function
+            clickButton.MouseButton1Click:Connect(function()
+                -- Run command
+                if cmd.func then
+                    cmd.func()
+                end
+                
+                -- Button press effect
+                commandButton.BackgroundColor3 = colors.buttonSelected
+                wait(0.1)
+                commandButton.BackgroundColor3 = colors.button
+            end)
+            
+            yOffset = yOffset + buttonHeight + 5
+        end
+        
+        -- Adjust canvas size
         commandList.CanvasSize = UDim2.new(0, 0, 0, yOffset)
     end
     
-    -- İlk kategoriyi göster
+    -- Show first category
     updateContentPanel()
     
-    -- GUI'yi görünür yap
+    -- Make GUI visible
     mainGUI.Enabled = true
     guiCreated = true
     guiVisible = true
     
-    -- Infinite Yield gibi RightControl tuşunu kısayol olarak ekle
+    -- Add RightControl shortcut like Infinite Yield
     UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if not gameProcessed and input.KeyCode == Enum.KeyCode.RightControl then
-            -- GUI'yi aç/kapat
-            mainGUI.Enabled = not mainGUI.Enabled
-            guiVisible = mainGUI.Enabled
+            -- Toggle GUI
+            if miniSize then
+                -- If in mini mode, switch to full GUI
+                miniSize = false
+                mainFrame.Visible = true
+                miniLogo.Visible = false
+            else
+                -- Toggle visibility
+                guiVisible = not guiVisible
+                mainGUI.Enabled = guiVisible
+            end
         end
     end)
     
@@ -2080,23 +2728,23 @@ function createMainGUI()
 end
 
 -- =====================
--- Ana Fonksiyon
+-- Main Function
 -- =====================
 
--- GUI'yi başlat
+-- Start GUI
 if not keyVerified then
     createKeyVerificationGUI()
 else
     createMainGUI()
 end
 
--- Sonsuz zıplama için event
+-- Infinite jump event
 UserInputService.JumpRequest:Connect(function()
     if infiniteJump and player.Character and player.Character:FindFirstChild("Humanoid") then
         player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
 
--- Başlatma mesajı
-print("KİLASİK GUI yüklendi! Key: " .. KEY_CODE)
-print("KİLASİK GUI'yi açmak/kapatmak için RightControl tuşunu kullanın.")
+-- Startup message
+print("KILASIK GUI loaded! Key: " .. KEY_CODE)
+print("Use RightControl to toggle GUI.")
